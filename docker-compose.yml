@@ -1,0 +1,27 @@
+services:
+  dingtalk-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dingtalk-mock
+    restart: unless-stopped
+    ports:
+      - "18722:18722"
+    environment:
+      # 强制启用 API Key 鉴权 — 留空则开放模式
+      API_KEY: ${API_KEY:-}
+      TZ: Asia/Tokyo
+    volumes:
+      # 持久化日志（mock-events.jsonl、stdout、device-roles.json）
+      - ./logs:/app/local_rebuild/logs
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:18722/health', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

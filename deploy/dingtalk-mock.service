@@ -1,0 +1,41 @@
+# systemd service for the DingTalk GroupBill mock server.
+#
+# Install:
+#   sudo cp dingtalk-mock.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dingtalk-mock
+#
+# Logs:  journalctl -u dingtalk-mock -f
+# Status: systemctl status dingtalk-mock
+# Restart: systemctl restart dingtalk-mock
+#
+# Replace PROJECT_DIR, USER, and API_KEY as needed.
+
+[Unit]
+Description=DingTalk GroupBill Mock Server (FastAPI + uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data                              # ← replace with the service user
+Group=www-data
+WorkingDirectory=PROJECT_DIR               # ← replace with absolute project path
+Environment=PYTHONPATH=PROJECT_DIR          # ← same as WorkingDirectory
+Environment=API_KEY=CHANGE-ME-TO-RANDOM-32-CHARS  # ← set a strong random key (or remove for open mode)
+# Bind to loopback only — Nginx fronts the public interface.
+ExecStart=/usr/bin/python3 -m uvicorn local_rebuild.server.main:app --host 127.0.0.1 --port 18722 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=3s
+StandardOutput=append:PROJECT_DIR/local_rebuild/logs/mock-server.stdout.log
+StandardError=append:PROJECT_DIR/local_rebuild/logs/mock-server.stderr.log
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=PROJECT_DIR/local_rebuild/logs PROJECT_DIR/local_rebuild/dist
+
+[Install]
+WantedBy=multi-user.target
