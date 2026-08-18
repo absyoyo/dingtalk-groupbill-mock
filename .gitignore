@@ -31,11 +31,11 @@ local_rebuild/dist/*.apk
 local_rebuild/dist/*.backend-url
 
 # 静态分析产物（体积大）
-static/
-evidence/
-reports/
-tools/
-docs/superpowers/
+/static/
+/evidence/
+/reports/
+/tools/
+/docs/superpowers/
 
 # 日志
 local_rebuild/logs/*
