@@ -55,3 +55,4 @@ device-roles.json
 .DS_Store
 Thumbs.db
 *.idsig
+local_rebuild/tools/
