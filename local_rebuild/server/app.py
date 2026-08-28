@@ -16,9 +16,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from starlette.websockets import WebSocketDisconnect
 
+from local_rebuild.server.device_crypto import DeviceKeyStore, SignVerifyError, decrypt_hybrid
 from local_rebuild.server.event_hub import EventHub
 from local_rebuild.server.event_log import EventLog
 
@@ -460,6 +461,9 @@ def create_app(event_log_path: str | Path) -> FastAPI:
     app.state.event_hub = EventHub()
     app.state.collect_store = CollectStore()
     app.state.device_roles = DeviceRoleStore(app.state.event_log_path.parent / "device-roles.json")
+    app.state.device_keys = DeviceKeyStore(app.state.event_log_path.parent / "device-keys.json")
+    # 设备上报签名强制开关：1=未签名/验签失败一律 401；默认 log-only（照收并记录安全事件）
+    app.state.device_sign_enforce = os.environ.get("DEVICE_SIGN_ENFORCE", "").strip() == "1"
     app.state.collect_logs_path = app.state.event_log_path.parent / "collect-logs.jsonl"
     logcat_log = app.state.event_log_path.parent / "device-logcat.log"
     app.state.logcat_log_path = logcat_log
@@ -516,20 +520,124 @@ def create_app(event_log_path: str | Path) -> FastAPI:
         record(connection_id, "out", "http", route, response)
         return response
 
-    @app.post("/api/device/upload_order", tags=["设备上报"], summary="上报订单", description="APK 端发起群收款时上报订单信息：user/pay_order/pay_id/amount。")
-    async def upload_order(body: UploadOrder):
+    async def _invalid_device_request(request: Request, errors: list[Any], body: Any = None) -> JSONResponse:
+        """Record + return the same 400 shape as the RequestValidationError handler."""
+        connection_id = uuid.uuid4().hex
+        payload: dict[str, Any] = {"rejected": True, "body": _normalize_body(body), "errors": errors}
+        record(connection_id, "in", "http", request.url.path, payload)
+        response = api_fail(CODE_INVALID_REQUEST, "参数校验失败")
+        record(connection_id, "out", "http", request.url.path, response)
+        return JSONResponse(status_code=400, content=response)
+
+    async def _read_device_payload(request: Request) -> tuple[dict[str, Any] | None, JSONResponse | None]:
+        """Guard + parse one device report.
+
+        * verifies ``X-Device-Id``/``X-Sign`` HMAC headers when present
+          (``DEVICE_SIGN_ENFORCE=1`` rejects unsigned/invalid reports with 401;
+          default log-only mode records a security event and proceeds)
+        * transparently decrypts hybrid-wrapped bodies (``{"ek","iv","ct"}``)
+        * returns ``(payload_dict, None)`` or ``(None, error_response)``
+        """
+        raw = await request.body()
+        keys: DeviceKeyStore = app.state.device_keys
+        device_id = request.headers.get("X-Device-Id") or ""
+        signed = bool(device_id and request.headers.get("X-Sign"))
+        if signed:
+            try:
+                keys.verify_headers(device_id, request.method, request.url.path, raw, dict(request.headers))
+            except SignVerifyError as exc:
+                record(uuid.uuid4().hex, "in", "http", request.url.path, {
+                    "security": "device.sign_rejected", "device_id": device_id, "error": str(exc),
+                })
+                if app.state.device_sign_enforce:
+                    return None, JSONResponse(
+                        status_code=401,
+                        content=api_fail(CODE_INVALID_REQUEST, f"设备签名校验失败: {exc}"),
+                    )
+        elif app.state.device_sign_enforce:
+            return None, JSONResponse(
+                status_code=401,
+                content=api_fail(CODE_INVALID_REQUEST, "缺少设备签名（X-Device-Id/X-Sign）"),
+            )
+
+        try:
+            parsed = json.loads(raw) if raw else None
+        except json.JSONDecodeError:
+            return None, await _invalid_device_request(request, [{"type": "json_invalid", "msg": "invalid JSON"}], raw)
+        if isinstance(parsed, dict) and set(parsed.keys()) == {"ek", "iv", "ct"}:
+            priv_pem, _ = keys.server_keypair()
+            try:
+                decrypted = decrypt_hybrid(priv_pem, parsed)
+            except SignVerifyError as exc:
+                return None, await _invalid_device_request(request, [{"type": "decrypt", "msg": str(exc)}], parsed)
+            try:
+                parsed = json.loads(decrypted)
+            except json.JSONDecodeError:
+                return None, await _invalid_device_request(request, [{"type": "json_invalid", "msg": "decrypted payload is not JSON"}], decrypted)
+        if not isinstance(parsed, dict):
+            return None, await _invalid_device_request(request, [{"type": "model", "msg": "body must be a JSON object"}], parsed)
+        return parsed, None
+
+    @app.post("/api/device/enroll", tags=["设备上报"], summary="设备密钥注册", description="设备生成本机 RSA 密钥对后注册：服务器签发 device_id，并用设备公钥 RSA-OAEP 加密下发 HMAC 签名密钥。")
+    async def device_enroll(request: Request):
+        """Issue per-device signing credentials (secret encrypted to the device key)."""
+        raw = await request.body()
+        try:
+            payload = json.loads(raw) if raw else None
+        except json.JSONDecodeError:
+            return await _invalid_device_request(request, [{"type": "json_invalid", "msg": "invalid JSON"}], raw)
+        if not isinstance(payload, dict):
+            return await _invalid_device_request(request, [{"type": "model", "msg": "body must be a JSON object"}], payload)
+        user_id = str(payload.get("userId") or "")
+        account_id = str(payload.get("accountId") or "")
+        device_public_key = str(payload.get("devicePublicKey") or "")
+        if not user_id or not device_public_key:
+            return await _invalid_device_request(request, [{"type": "missing", "msg": "userId/devicePublicKey required"}], payload)
+        try:
+            result = app.state.device_keys.enroll(user_id, account_id, device_public_key)
+        except SignVerifyError as exc:
+            return await _invalid_device_request(request, [{"type": "enroll", "msg": str(exc)}], payload)
+        connection_id = uuid.uuid4().hex
+        record(connection_id, "in", "http", "/api/device/enroll", {"userId": user_id, "accountId": account_id})
+        response = api_ok(data=result)
+        record(connection_id, "out", "http", "/api/device/enroll", response)
+        return response
+
+    @app.post("/api/device/upload_order", tags=["设备上报"], summary="上报订单", description="APK 端发起群收款时上报订单信息：user/pay_order/pay_id/amount。支持 HMAC 签名头与混合加密体。")
+    async def upload_order(request: Request):
         """Receive the injected module's order metadata report."""
-        return await record_http("/api/device/upload_order", body.model_dump())
+        payload, err = await _read_device_payload(request)
+        if err is not None:
+            return err
+        try:
+            model = UploadOrder(**payload)
+        except ValidationError as exc:
+            return await _invalid_device_request(request, exc.errors(), payload)
+        return await record_http("/api/device/upload_order", model.model_dump())
 
-    @app.post("/api/device/upload_sdk", tags=["设备上报"], summary="上报SDK参数", description="APK 端调起支付SDK时上报：pay_id/sdk_param。")
-    async def upload_sdk(body: UploadSdk):
+    @app.post("/api/device/upload_sdk", tags=["设备上报"], summary="上报SDK参数", description="APK 端调起支付SDK时上报：pay_id/sdk_param。支持 HMAC 签名头与混合加密体。")
+    async def upload_sdk(request: Request):
         """Receive the injected module's payment SDK parameter report."""
-        return await record_http("/api/device/upload_sdk", body.model_dump())
+        payload, err = await _read_device_payload(request)
+        if err is not None:
+            return err
+        try:
+            model = UploadSdk(**payload)
+        except ValidationError as exc:
+            return await _invalid_device_request(request, exc.errors(), payload)
+        return await record_http("/api/device/upload_sdk", model.model_dump())
 
-    @app.post("/api/device/mark_paid", tags=["设备上报"], summary="标记已支付", description="APK 端支付成功后上报：pay_id。")
-    async def mark_paid(body: MarkPaid):
+    @app.post("/api/device/mark_paid", tags=["设备上报"], summary="标记已支付", description="APK 端支付成功后上报：pay_id。支持 HMAC 签名头与混合加密体。")
+    async def mark_paid(request: Request):
         """Receive a local paid-state notification for a payment ID."""
-        return await record_http("/api/device/mark_paid", body.model_dump())
+        payload, err = await _read_device_payload(request)
+        if err is not None:
+            return err
+        try:
+            model = MarkPaid(**payload)
+        except ValidationError as exc:
+            return await _invalid_device_request(request, exc.errors(), payload)
+        return await record_http("/api/device/mark_paid", model.model_dump())
 
     @app.websocket("/ws", name="apk_ws")
     async def ws_endpoint(ws: WebSocket):
@@ -551,6 +659,7 @@ def create_app(event_log_path: str | Path) -> FastAPI:
 
         try:
             record(connection_id, "in", "ws", "connected", {})
+            ws_user_id = ""
             while True:
                 text = await ws.receive_text()
                 try:
@@ -568,6 +677,20 @@ def create_app(event_log_path: str | Path) -> FastAPI:
                 msg_type: str = envelope["type"]
                 record(connection_id, "in", "ws", msg_type, envelope)
 
+                # 设备 WS envelope 验签（log-only）：data.sig 存在时校验，
+                # 失败记录安全事件后仍按原流程处理（enforce 开关不作用于 WS）
+                if msg_type in ("bill.upsert", "alipay.upload", "rpc.result") and ws_user_id:
+                    data_ws = envelope.get("data")
+                    if isinstance(data_ws, dict) and data_ws.get("sig"):
+                        device_rec = app.state.device_keys.device_id_for_user(ws_user_id)
+                        if device_rec:
+                            try:
+                                app.state.device_keys.verify_ws_envelope(device_rec, envelope)
+                            except SignVerifyError as exc:
+                                record(connection_id, "in", "ws", "security.ws_sign_rejected", {
+                                    "user_id": ws_user_id, "error": str(exc),
+                                })
+
                 if msg_type == "alipay.upload":
                     data = envelope.get("data", {}) if isinstance(envelope.get("data"), dict) else {}
                     bill_id = data.get("groupBillId", "")
@@ -584,6 +707,7 @@ def create_app(event_log_path: str | Path) -> FastAPI:
                     data = envelope.get("data", {})
                     user_id: str = data.get("userId", "") if isinstance(data, dict) else ""
                     account_id: str = data.get("accountId", "") if isinstance(data, dict) else ""
+                    ws_user_id = user_id
                     await manager.register(ws, connection_id, user_id, account_id)
                     ack = {
                         "type": "ack",
