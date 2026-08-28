@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install Python deps (cached layer)
-RUN pip install --no-cache-dir fastapi==0.111.* 'uvicorn[standard]>=0.30' pydantic>=2.7
+RUN pip install --no-cache-dir fastapi==0.111.* 'uvicorn[standard]>=0.30' pydantic>=2.7 'cryptography>=42.0'
 
 # Copy the server code (local_rebuild package) and the built Vue static files
 # (local_rebuild/server/static/index.html must exist locally — run npm run build first)
