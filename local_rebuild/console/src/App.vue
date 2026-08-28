@@ -7,6 +7,7 @@ import EventsView from './views/EventsView.vue'
 import OrdersView from './views/OrdersView.vue'
 import LogsView from './views/LogsView.vue'
 import ApiDocsView from './views/ApiDocsView.vue'
+import GuideView from './views/GuideView.vue'
 
 const active = ref('devices')
 const liveCount = ref(0)
@@ -32,6 +33,7 @@ onUnmounted(() => socket && socket.close())
         <el-menu-item index="events">事件流</el-menu-item>
         <el-menu-item index="orders">订单查询</el-menu-item>
         <el-menu-item index="logs">日志</el-menu-item>
+        <el-menu-item index="guide">操作教程</el-menu-item>
         <el-menu-item index="api">API 文档</el-menu-item>
       </el-menu>
     </el-aside>
@@ -46,6 +48,7 @@ onUnmounted(() => socket && socket.close())
         <EventsView v-else-if="active === 'events'" />
         <OrdersView v-else-if="active === 'orders'" />
         <LogsView v-else-if="active === 'logs'" />
+        <GuideView v-else-if="active === 'guide'" />
         <ApiDocsView v-else-if="active === 'api'" />
         <ApiDocsView v-else />
       </el-main>
