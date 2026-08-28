@@ -15,6 +15,8 @@ function buildAlipayScheme(payUrl) {
 const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
 
 const billId = new URLSearchParams(location.search).get('bill') || ''
+const autoPayer = new URLSearchParams(location.search).get('payer') || ''
+const autoFlag = new URLSearchParams(location.search).get('auto') === '1'
 const loading = ref(true)
 const detail = ref(null)
 const loadError = ref('')
@@ -88,36 +90,39 @@ function latestPayUrl(uid) {
 }
 
 async function pay() {
-  window.__paylog = window.__paylog || []
-  const L = (m) => { window.__paylog.push(m); console.log('[pay]', m) }
-  L('invoked')
   const row = selectedRow.value
-  L('row=' + JSON.stringify(row))
   if (!row) return ElMessage.warning('请先选择付款人')
   const payUrl = latestPayUrl(row.uid)
-  L('payUrl len=' + (payUrl || '').length)
   if (!payUrl) return ElMessage.warning('该付款人还没有支付链接，请先在控制台「拉支付链接」')
   paying.value = true
-  L('paying=true, isMobile=' + isMobile)
   try {
     if (isMobile) {
       // 手机：直接唤起支付宝客户端收银台
       window.location.href = buildAlipayScheme(payUrl)
       ElMessage.info('正在唤起支付宝…若未响应请确认已安装支付宝')
     } else {
-      // PC：展示 scheme 二维码，手机支付宝扫码拉起收银台
-      payLink.value = buildAlipayScheme(payUrl)
-      L('calling QRCode.toDataURL, typeof=' + typeof QRCode?.toDataURL)
-      qrDataUrl.value = await QRCode.toDataURL(payLink.value, { width: 240, margin: 1 })
-      L('QR done len=' + qrDataUrl.value.length)
-      ElMessage.success('请用手机支付宝扫描二维码完成支付')
+      // PC：真实 orderStr 超过二维码容量上限（实测 2707 字符，编码后 >3200，
+      // QR 上限 2953 字节），因此二维码放收银台短链接：手机扫码打开本页
+      // （auto=1）后自动唤起支付宝
+      const jumpUrl = `${location.origin}/cashier.html?bill=${encodeURIComponent(billId)}&payer=${encodeURIComponent(row.uid)}&auto=1`
+      payLink.value = jumpUrl
+      qrDataUrl.value = await QRCode.toDataURL(jumpUrl, { width: 240, margin: 1 })
+      ElMessage.success('请用手机浏览器/支付宝扫码，将自动打开支付宝收银台')
     }
   } catch (e) {
-    L('EXC: ' + (e && e.message))
-    throw e
+    ElMessage.error(`生成支付链接失败: ${e?.message || e}`)
   } finally {
     paying.value = false
   }
+}
+
+// auto=1（扫码进入）：移动端加载完成后自动唤起支付宝
+async function autoJump() {
+  if (!autoFlag || !isMobile) return
+  const uid = autoPayer || selectedPayer.value
+  const payUrl = latestPayUrl(uid)
+  if (!payUrl) return
+  window.location.href = buildAlipayScheme(payUrl)
 }
 
 async function probe() {
@@ -145,6 +150,10 @@ onMounted(async () => {
     return
   }
   await load()
+  if (autoPayer && payerRows.value.some((r) => r.uid === autoPayer)) {
+    selectedPayer.value = autoPayer
+  }
+  await autoJump()
 })
 </script>
 
@@ -217,10 +226,12 @@ onMounted(async () => {
         </el-button>
 
         <div v-if="qrDataUrl" style="text-align:center; margin-top:20px">
-          <el-divider>手机支付宝扫码支付</el-divider>
-          <img :src="qrDataUrl" alt="支付宝支付二维码" style="width:240px; height:240px" />
-          <p style="color:#909399; font-size:12px">打开支付宝「扫一扫」，识别后将在支付宝内完成支付</p>
-          <el-link type="primary" :href="payLink">{{ payLink.slice(0, 60) }}…</el-link>
+          <el-divider>手机扫码支付</el-divider>
+          <img :src="qrDataUrl" alt="支付二维码" style="width:240px; height:240px" />
+          <p style="color:#909399; font-size:12px">
+            用手机浏览器或支付宝「扫一扫」扫描，将打开收银台并自动唤起支付宝付款
+          </p>
+          <el-link type="primary" :href="payLink">{{ payLink }}</el-link>
         </div>
 
         <p style="color:#c0c4cc; font-size:11px; margin-top:16px; text-align:center">
