@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -84,6 +85,79 @@ UC_AUTH_INVOKE = (
     "(Landroid/content/Context;[Ljava/lang/String;)V\n"
 )
 UC_AUTH_METHOD_REF = "IStartupController;->checkAuthorization("
+CRYPTOBOX_SMALI_SRC = (
+    Path(__file__).resolve().parents[1] / "hook" / "smali" / "CryptoBox.smali"
+)
+CRYPTOBOX_DEST = Path("classes36/com/dingtalk/groupbill/net/CryptoBox.smali")
+CRYPTO_HTTP_MARKER = "    # localtest: crypto wrap\n"
+CRYPTO_HTTP_ANCHOR = (
+    "    invoke-virtual {v0, v2, v3}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V\n"
+    "\n"
+    "    .line 85\n"
+    "    invoke-virtual {p1}, Lorg/json/JSONObject;->toString()Ljava/lang/String;\n"
+    "\n"
+    "    move-result-object v2\n"
+    "\n"
+    "    sget-object v3, Ljava/nio/charset/StandardCharsets;->UTF_8:Ljava/nio/charset/Charset;\n"
+    "\n"
+    "    invoke-virtual {v2, v3}, Ljava/lang/String;->getBytes(Ljava/nio/charset/Charset;)[B\n"
+    "\n"
+    "    move-result-object v2\n"
+)
+CRYPTO_HTTP_REPLACEMENT = (
+    "    invoke-virtual {v0, v2, v3}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V\n"
+    "\n"
+    + CRYPTO_HTTP_MARKER
+    + "    invoke-static {v0, p0, p1}, Lcom/dingtalk/groupbill/net/CryptoBox;->prepareHttp(Ljava/net/HttpURLConnection;Ljava/lang/String;Lorg/json/JSONObject;)[B\n"
+    "\n"
+    "    move-result-object v2\n"
+)
+CRYPTO_WS_MARKER = "    # localtest: crypto ws sign\n"
+CRYPTO_WS_ANCHOR = (
+    "    invoke-virtual {v3, v0, v4}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;\n"
+    "\n"
+    "    .line 515\n"
+    "    invoke-virtual {v3}, Lorg/json/JSONObject;->toString()Ljava/lang/String;\n"
+)
+CRYPTO_WS_REPLACEMENT = (
+    "    invoke-virtual {v3, v0, v4}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;\n"
+    "\n"
+    + CRYPTO_WS_MARKER
+    + "    invoke-static {p1, v4}, Lcom/dingtalk/groupbill/net/CryptoBox;->signWsData(Ljava/lang/String;Lorg/json/JSONObject;)V\n"
+    "\n"
+    "    .line 515\n"
+    "    invoke-virtual {v3}, Lorg/json/JSONObject;->toString()Ljava/lang/String;\n"
+)
+CRYPTO_ID_MARKER = "    # localtest: crypto identity\n"
+CRYPTO_ID_ANCHOR = (
+    "    :cond_2e\n"
+    "    :try_start_2e\n"
+    "    new-instance v1, Lorg/json/JSONObject;\n"
+    "\n"
+    "    invoke-direct {v1}, Lorg/json/JSONObject;-><init>()V\n"
+    "\n"
+    "    .line 376\n"
+    "    .local v1, \"data\":Lorg/json/JSONObject;\n"
+    "    const-string v2, \"userId\"\n"
+)
+CRYPTO_ID_REPLACEMENT = (
+    "    :cond_2e\n"
+    "    :try_start_2e\n"
+    + CRYPTO_ID_MARKER
+    + "    iget-object v2, p0, Lcom/dingtalk/groupbill/net/GroupBillWsClient;->userId:Ljava/lang/String;\n"
+    "\n"
+    "    iget-object v1, p0, Lcom/dingtalk/groupbill/net/GroupBillWsClient;->accountId:Ljava/lang/String;\n"
+    "\n"
+    "    invoke-static {v2, v1}, Lcom/dingtalk/groupbill/net/CryptoBox;->setIdentity(Ljava/lang/String;Ljava/lang/String;)V\n"
+    "\n"
+    "    new-instance v1, Lorg/json/JSONObject;\n"
+    "\n"
+    "    invoke-direct {v1}, Lorg/json/JSONObject;-><init>()V\n"
+    "\n"
+    "    .line 376\n"
+    "    .local v1, \"data\":Lorg/json/JSONObject;\n"
+    "    const-string v2, \"userId\"\n"
+)
 
 
 @dataclass(frozen=True)
@@ -342,6 +416,51 @@ def verify_tree(
             )
 
 
+def inject_cryptobox(root: str | Path) -> None:
+    """Copy compiled CryptoBox.smali into classes36 and patch HTTP/WS choke points."""
+    if not CRYPTOBOX_SMALI_SRC.exists():
+        raise FileNotFoundError(f"CryptoBox smali missing: {CRYPTOBOX_SMALI_SRC} (run compile_cryptobox.sh)")
+    dest = Path(root) / CRYPTOBOX_DEST
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(CRYPTOBOX_SMALI_SRC, dest)
+
+    http_path = Path(root) / "classes36/com/dingtalk/groupbill/net/HttpReporter.smali"
+    http = http_path.read_text(encoding="utf-8")
+    if CRYPTO_HTTP_MARKER not in http:
+        if http.count(CRYPTO_HTTP_ANCHOR) != 1:
+            raise ValueError(f"{http_path}: expected one crypto HTTP anchor, found {http.count(CRYPTO_HTTP_ANCHOR)}")
+        http_path.write_text(http.replace(CRYPTO_HTTP_ANCHOR, CRYPTO_HTTP_REPLACEMENT), encoding="utf-8")
+
+    ws_path = Path(root) / "classes36/com/dingtalk/groupbill/net/GroupBillWsClient.smali"
+    ws = ws_path.read_text(encoding="utf-8")
+    if CRYPTO_WS_MARKER not in ws:
+        if ws.count(CRYPTO_WS_ANCHOR) != 1:
+            raise ValueError(f"{ws_path}: expected one crypto WS sign anchor, found {ws.count(CRYPTO_WS_ANCHOR)}")
+        ws = ws.replace(CRYPTO_WS_ANCHOR, CRYPTO_WS_REPLACEMENT)
+    if CRYPTO_ID_MARKER not in ws:
+        if ws.count(CRYPTO_ID_ANCHOR) != 1:
+            raise ValueError(f"{ws_path}: expected one crypto identity anchor, found {ws.count(CRYPTO_ID_ANCHOR)}")
+        ws = ws.replace(CRYPTO_ID_ANCHOR, CRYPTO_ID_REPLACEMENT)
+    ws_path.write_text(ws, encoding="utf-8")
+
+
+def verify_cryptobox(root: str | Path) -> None:
+    """Verify CryptoBox.smali is present and both choke points were patched."""
+    dest = Path(root) / CRYPTOBOX_DEST
+    if not dest.exists() or "prepareHttp" not in dest.read_text(encoding="utf-8"):
+        raise ValueError(f"{dest}: CryptoBox.smali missing or incomplete")
+    http = (Path(root) / "classes36/com/dingtalk/groupbill/net/HttpReporter.smali").read_text(encoding="utf-8")
+    # Comments are stripped by the smali assemble/baksmali round-trip, so verify
+    # the invoke itself rather than the injection marker.
+    if "CryptoBox;->prepareHttp" not in http:
+        raise ValueError("HttpReporter.smali: crypto wrap missing")
+    ws = (Path(root) / "classes36/com/dingtalk/groupbill/net/GroupBillWsClient.smali").read_text(encoding="utf-8")
+    if "CryptoBox;->signWsData" not in ws:
+        raise ValueError("GroupBillWsClient.smali: crypto WS sign missing")
+    if "CryptoBox;->setIdentity" not in ws:
+        raise ValueError("GroupBillWsClient.smali: crypto identity missing")
+
+
 def patch_all(
     root: str | Path,
     server_url: str,
@@ -354,6 +473,7 @@ def patch_all(
     """Apply all literal and Android-version compatibility patches."""
     patch_tree(root, configured_patches(server_url, new_package))
     patch_creator_proxy(root)
+    inject_cryptobox(root)
     if enable_http_smoke:
         patch_http_smoke(root)
     if overlay_offset_dp > 0:
@@ -374,6 +494,7 @@ def verify_all(
     """Verify all literal and Android-version compatibility patches."""
     verify_tree(root, configured_patches(server_url, new_package))
     verify_creator_proxy(root)
+    verify_cryptobox(root)
     if expect_http_smoke:
         verify_http_smoke(root)
     else:

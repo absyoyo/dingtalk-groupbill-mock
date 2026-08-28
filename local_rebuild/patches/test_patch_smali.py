@@ -27,6 +27,11 @@ from local_rebuild.patches.patch_smali import (
     OVERLAY_MARKER,
     UC_AUTH_PATH,
     UC_AUTH_MARKER,
+    CRYPTO_HTTP_ANCHOR,
+    CRYPTO_WS_ANCHOR,
+    CRYPTO_ID_ANCHOR,
+    inject_cryptobox,
+    verify_cryptobox,
 )
 
 
@@ -211,9 +216,13 @@ def test_patch_all_leaves_http_smoke_disabled_by_default(tmp_path, monkeypatch):
         "local_rebuild.patches.patch_smali.patch_http_smoke",
         lambda root: called.append("smoke"),
     )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.inject_cryptobox",
+        lambda root: called.append("crypto"),
+    )
 
     patch_all(tmp_path, "https://api.example.com")
-    assert called == ["tree", "creator"]
+    assert called == ["tree", "creator", "crypto"]
 
 
 def test_patch_all_can_enable_http_smoke_explicitly(tmp_path, monkeypatch):
@@ -230,6 +239,10 @@ def test_patch_all_can_enable_http_smoke_explicitly(tmp_path, monkeypatch):
         "local_rebuild.patches.patch_smali.patch_http_smoke",
         lambda root: called.append("smoke"),
     )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.inject_cryptobox",
+        lambda root: None,
+    )
 
     patch_all(tmp_path, "https://api.example.com", enable_http_smoke=True)
     assert called == ["tree", "creator", "smoke"]
@@ -242,6 +255,7 @@ def test_patch_all_uses_the_configured_backend_url(tmp_path, monkeypatch):
         lambda root, specs: captured.extend(specs),
     )
     monkeypatch.setattr("local_rebuild.patches.patch_smali.patch_creator_proxy", lambda root: None)
+    monkeypatch.setattr("local_rebuild.patches.patch_smali.inject_cryptobox", lambda root: None)
 
     patch_all(tmp_path, server_url="https://API.EXAMPLE.COM/")
 
@@ -257,6 +271,7 @@ def test_verify_all_uses_the_configured_backend_url(tmp_path, monkeypatch):
     )
     monkeypatch.setattr("local_rebuild.patches.patch_smali.verify_creator_proxy", lambda root: None)
     monkeypatch.setattr("local_rebuild.patches.patch_smali.verify_http_smoke", lambda root: None)
+    monkeypatch.setattr("local_rebuild.patches.patch_smali.verify_cryptobox", lambda root: None)
 
     verify_all(
         tmp_path,
@@ -377,6 +392,10 @@ def test_patch_all_skips_overlay_offset_by_default(tmp_path, monkeypatch):
         "local_rebuild.patches.patch_smali.patch_overlay_offset",
         lambda root, dp: called.append("overlay"),
     )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.inject_cryptobox",
+        lambda root: None,
+    )
 
     patch_all(tmp_path, "https://api.example.com")
     assert called == ["tree", "creator"]
@@ -395,6 +414,10 @@ def test_patch_all_applies_overlay_offset_when_positive(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "local_rebuild.patches.patch_smali.patch_overlay_offset",
         lambda root, dp: called.append(("overlay", dp)),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.inject_cryptobox",
+        lambda root: None,
     )
 
     patch_all(tmp_path, "https://api.example.com", overlay_offset_dp=96)
@@ -524,6 +547,10 @@ def test_patch_all_skips_uc_auth_bypass_by_default(tmp_path, monkeypatch):
         "local_rebuild.patches.patch_smali.patch_uc_auth_bypass",
         lambda root: called.append("uc"),
     )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.inject_cryptobox",
+        lambda root: None,
+    )
 
     patch_all(tmp_path, "https://api.example.com")
     assert called == ["tree", "creator"]
@@ -543,6 +570,25 @@ def test_patch_all_applies_uc_auth_bypass_when_enabled(tmp_path, monkeypatch):
         "local_rebuild.patches.patch_smali.patch_uc_auth_bypass",
         lambda root: called.append("uc"),
     )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.inject_cryptobox",
+        lambda root: None,
+    )
 
     patch_all(tmp_path, "https://api.example.com", uc_auth_bypass=True)
     assert "uc" in called
+
+
+def test_inject_cryptobox_patches_http_and_ws_choke_points(tmp_path):
+    http = tmp_path / "classes36/com/dingtalk/groupbill/net/HttpReporter.smali"
+    ws = tmp_path / "classes36/com/dingtalk/groupbill/net/GroupBillWsClient.smali"
+    http.parent.mkdir(parents=True, exist_ok=True)
+    http.write_text("prefix\n" + CRYPTO_HTTP_ANCHOR + "suffix\n", encoding="utf-8")
+    ws.write_text(
+        "head\n" + CRYPTO_WS_ANCHOR + "mid\n" + CRYPTO_ID_ANCHOR + "tail\n",
+        encoding="utf-8",
+    )
+    inject_cryptobox(tmp_path)
+    verify_cryptobox(tmp_path)
+    inject_cryptobox(tmp_path)  # idempotent
+    verify_cryptobox(tmp_path)
