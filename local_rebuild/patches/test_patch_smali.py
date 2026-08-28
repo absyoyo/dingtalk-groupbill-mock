@@ -30,6 +30,7 @@ from local_rebuild.patches.patch_smali import (
     CRYPTO_HTTP_ANCHOR,
     CRYPTO_WS_ANCHOR,
     CRYPTO_ID_ANCHOR,
+    CRYPTO_SELFTEST_ANCHOR,
     inject_cryptobox,
     verify_cryptobox,
 )
@@ -585,7 +586,7 @@ def test_inject_cryptobox_patches_http_and_ws_choke_points(tmp_path):
     http.parent.mkdir(parents=True, exist_ok=True)
     http.write_text("prefix\n" + CRYPTO_HTTP_ANCHOR + "suffix\n", encoding="utf-8")
     ws.write_text(
-        "head\n" + CRYPTO_WS_ANCHOR + "mid\n" + CRYPTO_ID_ANCHOR + "tail\n",
+        "head\n" + CRYPTO_WS_ANCHOR + "mid\n" + CRYPTO_ID_ANCHOR + "mid2\n" + CRYPTO_SELFTEST_ANCHOR + "tail\n",
         encoding="utf-8",
     )
     inject_cryptobox(tmp_path)

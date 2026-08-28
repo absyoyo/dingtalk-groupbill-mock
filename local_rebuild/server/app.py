@@ -542,6 +542,8 @@ def create_app(event_log_path: str | Path) -> FastAPI:
         keys: DeviceKeyStore = app.state.device_keys
         device_id = request.headers.get("X-Device-Id") or ""
         signed = bool(device_id and request.headers.get("X-Sign"))
+        request.state.device_signed = signed
+        request.state.device_encrypted = False
         if signed:
             try:
                 keys.verify_headers(device_id, request.method, request.url.path, raw, dict(request.headers))
@@ -565,6 +567,7 @@ def create_app(event_log_path: str | Path) -> FastAPI:
         except json.JSONDecodeError:
             return None, await _invalid_device_request(request, [{"type": "json_invalid", "msg": "invalid JSON"}], raw)
         if isinstance(parsed, dict) and set(parsed.keys()) == {"ek", "iv", "ct"}:
+            request.state.device_encrypted = True
             priv_pem, _ = keys.server_keypair()
             try:
                 decrypted = decrypt_hybrid(priv_pem, parsed)
@@ -637,7 +640,15 @@ def create_app(event_log_path: str | Path) -> FastAPI:
             model = MarkPaid(**payload)
         except ValidationError as exc:
             return await _invalid_device_request(request, exc.errors(), payload)
-        return await record_http("/api/device/mark_paid", model.model_dump())
+        dumped = model.model_dump()
+        if str(dumped.get("pay_id") or "").startswith("SELFTEST_"):
+            app.state.collect_store.resolve("selftest", dumped["pay_id"], {
+                "pay_id": dumped["pay_id"],
+                "signed": bool(getattr(request.state, "device_signed", False)),
+                "encrypted": bool(getattr(request.state, "device_encrypted", False)),
+                "device_id": request.headers.get("X-Device-Id") or "",
+            })
+        return await record_http("/api/device/mark_paid", dumped)
 
     @app.websocket("/ws", name="apk_ws")
     async def ws_endpoint(ws: WebSocket):
@@ -748,7 +759,7 @@ def create_app(event_log_path: str | Path) -> FastAPI:
         finally:
             app.state.event_hub.unsubscribe(queue)
 
-    _ALLOWED_DEBUG_TYPES: set[str] = {"bill.task", "orders.follow", "bill.done", "rpc.call", "alipay.result"}
+    _ALLOWED_DEBUG_TYPES: set[str] = {"bill.task", "orders.follow", "bill.done", "rpc.call", "alipay.result", "crypto.selftest"}
 
     @app.post("/debug/ws/send", tags=["收款指令"], summary="调试-下发消息", description="直接给 APK WebSocket 发送 allowlist 消息（不等待回调）。", dependencies=[Depends(_verify_api_key)])
     async def debug_ws_send(body: DebugEnvelope):
@@ -1073,6 +1084,30 @@ def create_app(event_log_path: str | Path) -> FastAPI:
     async def admin_query_pay_status(body: CollectRequest):
         """Dispatch rpc.call {method: probe.payStatus} and await rpc.result."""
         return await _dispatch_rpc_call(app, body, "probe", "syncGroupBillPayStatusV2")
+
+    @app.post("/api/admin/crypto-selftest", tags=["收款指令"], summary="设备加密自测", description="向在线设备下发 crypto.selftest，设备走真实 mark_paid（HMAC 签名 + RSA/AES 混合加密），服务器等待并回报 signed/encrypted。", dependencies=[Depends(_verify_api_key)])
+    async def admin_crypto_selftest(body: CollectRequest):
+        """Ask the APK to fire one signed+encrypted mark_paid and wait for it."""
+        manager: ConnectionManager = app.state.ws_manager
+        if body.targetUid not in manager.devices:
+            return JSONResponse(status_code=409, content=api_fail(CODE_NO_CLIENT, "设备未连接"))
+        pay_id = f"SELFTEST_{body.targetUid}_{int(time.time())}"
+        envelope = {"type": "crypto.selftest", "data": {"pay_id": pay_id}}
+        wait_task = asyncio.create_task(
+            app.state.collect_store.await_for("selftest", pay_id, float(body.timeoutSeconds))
+        )
+        snapshot = await manager.send_to(body.targetUid, envelope)
+        if snapshot is None:
+            wait_task.cancel()
+            return JSONResponse(status_code=409, content=api_fail(CODE_NO_CLIENT, "设备未连接"))
+        record(snapshot.connection_id, "out", "ws", "crypto.selftest", envelope)
+        result = await wait_task
+        if result is None:
+            return JSONResponse(
+                status_code=504,
+                content=api_fail(CODE_COLLECT_TIMEOUT, f"等待加密自测超时（{body.timeoutSeconds}s）"),
+            )
+        return api_ok(data=result)
 
     @app.get("/api/admin/logs", tags=["日志"], summary="服务器日志", description="分页查询 uvicorn stdout 日志，支持 level/keyword 过滤。", dependencies=[Depends(_verify_api_key)])
     async def admin_logs(level: str | None = None, keyword: str | None = None, page: int = 1, size: int = 100):

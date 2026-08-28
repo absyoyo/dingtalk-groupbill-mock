@@ -140,6 +140,40 @@ CRYPTO_ID_ANCHOR = (
     "    .local v1, \"data\":Lorg/json/JSONObject;\n"
     "    const-string v2, \"userId\"\n"
 )
+CRYPTO_SELFTEST_MARKER = "    # localtest: crypto selftest\n"
+CRYPTO_SELFTEST_ANCHOR = (
+    "    const-string v1, \"bill.task\"\n"
+    "\n"
+    "    invoke-virtual {v1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\n"
+)
+CRYPTO_SELFTEST_REPLACEMENT = (
+    CRYPTO_SELFTEST_MARKER
+    + "    const-string v1, \"crypto.selftest\"\n"
+    "\n"
+    "    invoke-virtual {v1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\n"
+    "\n"
+    "    move-result v1\n"
+    "\n"
+    "    if-eqz v1, :cond_crypto_st\n"
+    "\n"
+    "    const-string v1, \"pay_id\"\n"
+    "\n"
+    "    const-string v5, \"SELFTEST\"\n"
+    "\n"
+    "    invoke-virtual {v4, v1, v5}, Lorg/json/JSONObject;->optString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n"
+    "\n"
+    "    move-result-object v1\n"
+    "\n"
+    "    invoke-static {v1}, Lcom/dingtalk/groupbill/net/HttpReporter;->markPaid(Ljava/lang/String;)V\n"
+    "\n"
+    "    return-void\n"
+    "\n"
+    "    :cond_crypto_st\n"
+    "    const-string v1, \"bill.task\"\n"
+    "\n"
+    "    invoke-virtual {v1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\n"
+)
+
 CRYPTO_ID_REPLACEMENT = (
     "    :cond_2e\n"
     "    :try_start_2e\n"
@@ -441,6 +475,10 @@ def inject_cryptobox(root: str | Path) -> None:
         if ws.count(CRYPTO_ID_ANCHOR) != 1:
             raise ValueError(f"{ws_path}: expected one crypto identity anchor, found {ws.count(CRYPTO_ID_ANCHOR)}")
         ws = ws.replace(CRYPTO_ID_ANCHOR, CRYPTO_ID_REPLACEMENT)
+    if CRYPTO_SELFTEST_MARKER not in ws:
+        if ws.count(CRYPTO_SELFTEST_ANCHOR) != 1:
+            raise ValueError(f"{ws_path}: expected one crypto selftest anchor, found {ws.count(CRYPTO_SELFTEST_ANCHOR)}")
+        ws = ws.replace(CRYPTO_SELFTEST_ANCHOR, CRYPTO_SELFTEST_REPLACEMENT)
     ws_path.write_text(ws, encoding="utf-8")
 
 
@@ -459,6 +497,8 @@ def verify_cryptobox(root: str | Path) -> None:
         raise ValueError("GroupBillWsClient.smali: crypto WS sign missing")
     if "CryptoBox;->setIdentity" not in ws:
         raise ValueError("GroupBillWsClient.smali: crypto identity missing")
+    if "crypto.selftest" not in ws:
+        raise ValueError("GroupBillWsClient.smali: crypto selftest handler missing")
 
 
 def patch_all(
