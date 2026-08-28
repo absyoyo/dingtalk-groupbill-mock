@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
@@ -6,6 +7,12 @@ export default defineConfig({
   build: {
     outDir: '../server/static',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        index: resolve(__dirname, 'index.html'),
+        cashier: resolve(__dirname, 'cashier.html'),
+      },
+    },
   },
   server: {
     proxy: {

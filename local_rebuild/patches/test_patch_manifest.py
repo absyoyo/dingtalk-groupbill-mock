@@ -62,7 +62,36 @@ def test_patch_manifest_changes_collision_prone_identity_values_only(tmp_path):
         "permission_references": 5,
         "authorities": 1,
         "task_affinities": 1,
+        "app_label": 0,
     }
+
+
+def test_patch_manifest_custom_package_and_app_label(tmp_path):
+    path = tmp_path / "AndroidManifest.xml"
+    path.write_text(MANIFEST, encoding="utf-8")
+    custom_pkg = "com.alibaba.android.rimet.localtest2"
+    custom_label = "钉钉子号"
+
+    stats = patch_manifest(path, new_package=custom_pkg, app_label=custom_label)
+
+    root = ET.parse(path).getroot()
+    assert root.get("package") == custom_pkg
+    application = next(element for element in root.iter() if local_name(element.tag) == "application")
+    assert application.get(ANDROID + "label") == custom_label
+
+    values = {
+        (local_name(element.tag), key, value)
+        for element in root.iter()
+        for key, value in element.attrib.items()
+    }
+    assert ("permission", ANDROID + "name", custom_pkg + ".permission.IPC") in values
+    assert ("uses-permission", ANDROID + "name", custom_pkg + ".permission.IPC") in values
+    assert ("uses-permission-sdk-23", ANDROID + "name", custom_pkg + ".permission.IPC") in values
+    assert ("service", ANDROID + "permission", custom_pkg + ".permission.IPC") in values
+    assert ("provider", ANDROID + "authorities", custom_pkg + ".provider;external.provider") in values
+    assert ("activity", ANDROID + "taskAffinity", custom_pkg + ".BokuiExternalActivity") in values
+    assert stats["app_label"] == 1
+    assert stats["package"] == 1
 
 
 def test_patch_manifest_rejects_unexpected_source_package(tmp_path):

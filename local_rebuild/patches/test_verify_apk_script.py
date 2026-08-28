@@ -14,7 +14,9 @@ def test_verify_script_checks_signature_manifest_and_exact_dex_literals():
     assert 'grep -Fxq \'AndroidManifest.xml\' "$LOGS/verify-00-entries.txt"' in source
     assert "--only-manifest -s" in source
     assert "verify_manifest.py" in source
-    assert "classes33.dex classes36.dex classes37.dex classes38.dex" in source
+    assert 'VERIFY_DEXS="classes33 classes36 classes37 classes38"' in source
+    # classes25 (UC auth bypass target) joins the patch set only when requested
+    assert "classes25 $PATCH_DEXS" in source or "classes25 $VERIFY_DEXS" in source
     assert "org.jf.baksmali.Main" in source
     assert "patch_smali.py" in source
     assert "--verify" in source

@@ -14,7 +14,9 @@ def test_build_script_rebuilds_resources_but_patches_only_injected_dex():
     assert ' d -f -s ' in source
     assert ' d -f -r -s ' not in source
     assert "--only-manifest" not in source
-    assert "classes33.dex classes36.dex classes37.dex classes38.dex" in source
+    assert 'PATCH_DEXS="classes33 classes36 classes37 classes38"' in source
+    # classes25 (UC auth bypass target) joins the patch set only when requested
+    assert "classes25 $PATCH_DEXS" in source or "classes25 $VERIFY_DEXS" in source
     assert "patch_manifest.py" in source
     assert "patch_smali.py" in source
     assert "org.jf.baksmali.Main" in source

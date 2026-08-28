@@ -15,9 +15,18 @@ from local_rebuild.patches.patch_smali import (
     patch_literal,
     patch_tree,
     verify_creator_proxy,
+    verify_overlay_offset,
     verify_all,
     verify_http_smoke,
     verify_tree,
+    patch_overlay_offset,
+    patch_uc_auth_bypass,
+    verify_uc_auth_bypass,
+    OVERLAY_Y_PATH,
+    OVERLAY_ANCHOR,
+    OVERLAY_MARKER,
+    UC_AUTH_PATH,
+    UC_AUTH_MARKER,
 )
 
 
@@ -91,6 +100,22 @@ def test_known_package_patch_specs_match_actual_compiler_layout():
         "classes37/com/dingtalk/groupbill/GroupBillHooks$3.smali": 1,
         "classes38/com/pineloader/PineLoader.smali": 1,
     }
+
+
+def test_package_patches_and_configured_patches_support_custom_package():
+    from local_rebuild.patches.patch_smali import configured_patches, package_patches
+
+    custom_pkg = "com.alibaba.android.rimet.localtest2"
+    specs = package_patches(custom_pkg)
+    assert len(specs) == 4
+    for spec in specs:
+        assert spec.replacement == custom_pkg
+        assert spec.original == "com.alibaba.android.rimet"
+
+    all_specs = configured_patches("http://192.168.1.10:18722", new_package=custom_pkg)
+    pkg_specs_in_all = [s for s in all_specs if s.original == "com.alibaba.android.rimet"]
+    assert len(pkg_specs_in_all) == 4
+    assert all(s.replacement == custom_pkg for s in pkg_specs_in_all)
 
 
 def test_verify_tree_checks_replacement_counts_and_rejects_originals(tmp_path):
@@ -241,3 +266,283 @@ def test_verify_all_uses_the_configured_backend_url(tmp_path, monkeypatch):
 
     endpoint_spec = next(spec for spec in captured if "HttpReporter" in str(spec.relative_path))
     assert endpoint_spec.replacement == "http://192.168.1.10:18722"
+
+
+def test_patch_overlay_offset_inserts_dp_offset_before_conversion(tmp_path):
+    path = tmp_path / OVERLAY_Y_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + OVERLAY_ANCHOR + "after\n", encoding="utf-8")
+
+    patch_overlay_offset(tmp_path, 96)
+    verify_overlay_offset(tmp_path, 96)
+
+    text = path.read_text(encoding="utf-8")
+    assert OVERLAY_MARKER in text
+    assert "    add-int/lit16 v3, v3, 96\n" in text
+    # offset is applied to the dp-unit base BEFORE the dp() conversion and the y write
+    assert text.index("add-int/lit16 v3, v3, 96") < text.index("->dp(")
+    assert text.index("->dp(") < text.index("WindowManager$LayoutParams;->y:I")
+
+
+def test_patch_overlay_offset_fails_closed_when_anchor_missing(tmp_path):
+    path = tmp_path / OVERLAY_Y_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("unrelated\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="overlay y anchor"):
+        patch_overlay_offset(tmp_path, 96)
+
+
+def test_patch_overlay_offset_is_not_reapplied(tmp_path):
+    path = tmp_path / OVERLAY_Y_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + OVERLAY_ANCHOR + "after\n", encoding="utf-8")
+
+    patch_overlay_offset(tmp_path, 96)
+    with pytest.raises(ValueError, match="already applied"):
+        patch_overlay_offset(tmp_path, 96)
+
+
+def test_patch_overlay_offset_rejects_non_positive(tmp_path):
+    path = tmp_path / OVERLAY_Y_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + OVERLAY_ANCHOR + "after\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="positive"):
+        patch_overlay_offset(tmp_path, 0)
+
+
+def test_verify_overlay_offset_rejects_unpatched(tmp_path):
+    path = tmp_path / OVERLAY_Y_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + OVERLAY_ANCHOR + "after\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="overlay offset verification failed"):
+        verify_overlay_offset(tmp_path, 96)
+
+
+def test_verify_overlay_offset_accepts_round_tripped_hex_without_marker(tmp_path):
+    # After smali->dex->baksmali the comment marker is stripped and the literal is
+    # rendered in hex (96 -> 0x60). verify must still accept this real-world form.
+    round_tripped = (
+        "    xor-int/lit16 v3, v3, -0x19f\n"
+        "\n"
+        "    add-int/lit16 v3, v3, 0x60\n"
+        "\n"
+        "    invoke-static {p0, v3}, Lcom/dingtalk/groupbill/ui/OverlayBanner;->dp(Landroid/content/Context;I)I\n"
+        "\n"
+        "    move-result v3\n"
+        "\n"
+        "    iput v3, v5, Landroid/view/WindowManager$LayoutParams;->y:I\n"
+    )
+    path = tmp_path / OVERLAY_Y_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + round_tripped + "after\n", encoding="utf-8")
+
+    verify_overlay_offset(tmp_path, 96)
+
+
+def test_verify_overlay_offset_rejects_misplaced_offset(tmp_path):
+    # add-int after the dp() conversion would offset px (wrong), verify must reject.
+    misplaced = (
+        "    xor-int/lit16 v3, v3, -0x19f\n"
+        "\n"
+        "    invoke-static {p0, v3}, Lcom/dingtalk/groupbill/ui/OverlayBanner;->dp(Landroid/content/Context;I)I\n"
+        "\n"
+        "    move-result v3\n"
+        "\n"
+        "    add-int/lit16 v3, v3, 0x60\n"
+        "\n"
+        "    iput v3, v5, Landroid/view/WindowManager$LayoutParams;->y:I\n"
+    )
+    path = tmp_path / OVERLAY_Y_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + misplaced + "after\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="wrong position"):
+        verify_overlay_offset(tmp_path, 96)
+
+
+def test_patch_all_skips_overlay_offset_by_default(tmp_path, monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_tree",
+        lambda root, specs: called.append("tree"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_creator_proxy",
+        lambda root: called.append("creator"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_overlay_offset",
+        lambda root, dp: called.append("overlay"),
+    )
+
+    patch_all(tmp_path, "https://api.example.com")
+    assert called == ["tree", "creator"]
+
+
+def test_patch_all_applies_overlay_offset_when_positive(tmp_path, monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_tree",
+        lambda root, specs: called.append("tree"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_creator_proxy",
+        lambda root: called.append("creator"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_overlay_offset",
+        lambda root, dp: called.append(("overlay", dp)),
+    )
+
+    patch_all(tmp_path, "https://api.example.com", overlay_offset_dp=96)
+    assert ("overlay", 96) in called
+
+
+UC_AUTH_FIXTURE_METHOD = '''.method public static a([Ljava/lang/String;Z)V
+    .registers 5
+
+    const v0, 0x40e2c1d
+
+    invoke-static {v0}, Lcom/uc/webview/base/timing/TraceEvent;->scoped(I)Lcom/uc/webview/base/timing/TraceEvent;
+
+    move-result-object v0
+
+    :try_start_7
+    invoke-static {}, Lcom/uc/webview/internal/interfaces/IStartupController$Instance;->get()Lcom/uc/webview/internal/interfaces/IStartupController;
+
+    move-result-object v1
+
+    :cond_23
+    invoke-static {}, Lcom/uc/webview/base/EnvInfo;->getContext()Landroid/content/Context;
+
+    move-result-object p1
+
+    invoke-interface {v1, p1, p0}, Lcom/uc/webview/internal/interfaces/IStartupController;->checkAuthorization(Landroid/content/Context;[Ljava/lang/String;)V
+    :try_end_2a
+    .catchall {:try_start_7 .. :try_end_2a} :catchall_30
+
+    if-eqz v0, :cond_2f
+
+    invoke-virtual {v0}, Lcom/uc/webview/base/timing/TraceEvent;->close()V
+
+    :cond_2f
+    return-void
+
+    :catchall_30
+    move-exception p0
+
+    if-eqz v0, :cond_3b
+
+    invoke-virtual {v0}, Lcom/uc/webview/base/timing/TraceEvent;->close()V
+
+    :cond_3b
+    goto :goto_3b
+
+    :goto_3b
+    throw p0
+.end method
+'''
+
+
+def write_uc_auth_fixture(tmp_path):
+    path = tmp_path / UC_AUTH_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + UC_AUTH_FIXTURE_METHOD + "after\n", encoding="utf-8")
+    return path
+
+
+def test_patch_uc_auth_bypass_replaces_invoke_with_nop(tmp_path):
+    path = write_uc_auth_fixture(tmp_path)
+
+    patch_uc_auth_bypass(tmp_path)
+    verify_uc_auth_bypass(tmp_path)
+
+    text = path.read_text(encoding="utf-8")
+    assert UC_AUTH_MARKER in text
+    assert "    nop\n" in text
+    assert "checkAuthorization" not in text
+    # method body and its tail survive untouched
+    assert ".method public static a([Ljava/lang/String;Z)V" in text
+    assert ":try_end_2a" in text
+    assert ".end method" in text
+
+
+def test_patch_uc_auth_bypass_fails_closed_when_invoke_missing(tmp_path):
+    path = tmp_path / UC_AUTH_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("unrelated\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="uc auth anchor"):
+        patch_uc_auth_bypass(tmp_path)
+
+
+def test_patch_uc_auth_bypass_is_not_reapplied(tmp_path):
+    write_uc_auth_fixture(tmp_path)
+
+    patch_uc_auth_bypass(tmp_path)
+    with pytest.raises(ValueError, match="already applied"):
+        patch_uc_auth_bypass(tmp_path)
+
+
+def test_verify_uc_auth_bypass_rejects_unpatched(tmp_path):
+    write_uc_auth_fixture(tmp_path)
+
+    with pytest.raises(ValueError, match="uc auth verification failed"):
+        verify_uc_auth_bypass(tmp_path)
+
+
+def test_verify_uc_auth_bypass_accepts_round_tripped_nop_without_marker(tmp_path):
+    # smali->dex->baksmali strips the marker comment; the nop stays and the
+    # checkAuthorization method reference disappears from the string pool.
+    round_tripped = UC_AUTH_FIXTURE_METHOD.replace(
+        "    invoke-interface {v1, p1, p0}, "
+        "Lcom/uc/webview/internal/interfaces/IStartupController;->checkAuthorization"
+        "(Landroid/content/Context;[Ljava/lang/String;)V\n",
+        "    nop\n",
+    )
+    path = tmp_path / UC_AUTH_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("before\n" + round_tripped + "after\n", encoding="utf-8")
+
+    verify_uc_auth_bypass(tmp_path)
+
+
+def test_patch_all_skips_uc_auth_bypass_by_default(tmp_path, monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_tree",
+        lambda root, specs: called.append("tree"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_creator_proxy",
+        lambda root: called.append("creator"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_uc_auth_bypass",
+        lambda root: called.append("uc"),
+    )
+
+    patch_all(tmp_path, "https://api.example.com")
+    assert called == ["tree", "creator"]
+
+
+def test_patch_all_applies_uc_auth_bypass_when_enabled(tmp_path, monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_tree",
+        lambda root, specs: called.append("tree"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_creator_proxy",
+        lambda root: called.append("creator"),
+    )
+    monkeypatch.setattr(
+        "local_rebuild.patches.patch_smali.patch_uc_auth_bypass",
+        lambda root: called.append("uc"),
+    )
+
+    patch_all(tmp_path, "https://api.example.com", uc_auth_bypass=True)
+    assert "uc" in called

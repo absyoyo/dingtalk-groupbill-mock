@@ -31,6 +31,31 @@ def test_verify_manifest_accepts_localtest_identity(tmp_path):
     verify_manifest(path)
 
 
+def test_verify_manifest_accepts_custom_package(tmp_path):
+    custom_pkg = "com.alibaba.android.rimet.localtest2"
+    manifest = f'''<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{custom_pkg}">
+  <permission android:name="{custom_pkg}.permission.IPC" />
+  <uses-permission android:name="{custom_pkg}.permission.IPC" />
+  <application android:name="com.alibaba.android.rimet.LauncherApplication">
+    <activity android:name="com.alibaba.android.rimet.biz.LaunchHomeActivity"
+      android:taskAffinity="{custom_pkg}.task" />
+    <service android:name="example.Service" android:permission="{custom_pkg}.permission.IPC" />
+    <provider android:name="example.Provider"
+      android:authorities="{custom_pkg}.provider"
+      android:readPermission="{custom_pkg}.permission.IPC" />
+  </application>
+</manifest>
+'''
+    path = tmp_path / "AndroidManifest.xml"
+    path.write_text(manifest, encoding="utf-8")
+
+    verify_manifest(path, new_package=custom_pkg)
+
+    with pytest.raises(ValueError, match="rebuilt package identity is incorrect"):
+        verify_manifest(path)  # 默认 NEW_PACKAGE 不匹配
+
+
 def test_verify_manifest_rejects_unrenamed_authority(tmp_path):
     path = tmp_path / "AndroidManifest.xml"
     write_manifest(path)

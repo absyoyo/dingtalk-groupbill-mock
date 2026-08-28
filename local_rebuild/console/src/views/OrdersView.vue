@@ -62,6 +62,10 @@ const newFlag = (bid) => newBillIds.value.has(bid)
 const emit = (row) => {
   ElMessage.info(`请到「收款指令」操作此账单: ${row.groupBillId}`)
 }
+
+const openCashier = (row) => {
+  window.open(`/cashier.html?bill=${encodeURIComponent(row.groupBillId)}`, '_blank')
+}
 </script>
 
 <template>
@@ -97,9 +101,10 @@ const emit = (row) => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180">
+      <el-table-column label="操作" width="240">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="emit(row)">拉支付链接</el-button>
+          <el-button size="small" type="success" @click="openCashier(row)">付款</el-button>
           <el-button size="small" @click="showDetail(row)">详情</el-button>
         </template>
       </el-table-column>

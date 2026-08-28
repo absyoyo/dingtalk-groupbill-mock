@@ -17,19 +17,23 @@ def local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
-def replace_prefix(value: str) -> str:
+def replace_prefix(value: str, new_package: str = NEW_PACKAGE) -> str:
     """Replace the application-owned package prefix without touching class-like peers."""
     if value == OLD_PACKAGE or value.startswith(OLD_PACKAGE + "."):
-        return NEW_PACKAGE + value[len(OLD_PACKAGE) :]
+        return new_package + value[len(OLD_PACKAGE) :]
     return value
 
 
-def replace_authorities(value: str) -> str:
+def replace_authorities(value: str, new_package: str = NEW_PACKAGE) -> str:
     """Rename application-owned tokens in a semicolon-separated authority list."""
-    return ";".join(replace_prefix(part.strip()) for part in value.split(";"))
+    return ";".join(replace_prefix(part.strip(), new_package) for part in value.split(";"))
 
 
-def patch_manifest(path: str | Path) -> dict[str, int]:
+def patch_manifest(
+    path: str | Path,
+    new_package: str = NEW_PACKAGE,
+    app_label: str | None = None,
+) -> dict[str, int]:
     """Rename collision-prone manifest identities while preserving component classes."""
     manifest_path = Path(path)
     ET.register_namespace("android", ANDROID_NS)
@@ -43,7 +47,7 @@ def patch_manifest(path: str | Path) -> dict[str, int]:
         if local_name(element.tag) != "permission":
             continue
         name = element.get(ANDROID + "name", "")
-        renamed = replace_prefix(name)
+        renamed = replace_prefix(name, new_package)
         if renamed != name:
             permission_map[name] = renamed
 
@@ -53,14 +57,18 @@ def patch_manifest(path: str | Path) -> dict[str, int]:
         "permission_references": 0,
         "authorities": 0,
         "task_affinities": 0,
+        "app_label": 0,
     }
-    root.set("package", NEW_PACKAGE)
+    root.set("package", new_package)
 
     for element in root.iter():
         tag = local_name(element.tag)
         name_key = ANDROID + "name"
         name = element.get(name_key)
-        if tag == "permission" and name in permission_map:
+        if tag == "application" and app_label is not None:
+            element.set(ANDROID + "label", app_label)
+            stats["app_label"] = 1
+        elif tag == "permission" and name in permission_map:
             element.set(name_key, permission_map[name])
             stats["permissions"] += 1
         elif tag.startswith("uses-permission") and name in permission_map:
@@ -78,7 +86,7 @@ def patch_manifest(path: str | Path) -> dict[str, int]:
             authorities_key = ANDROID + "authorities"
             authorities = element.get(authorities_key)
             if authorities:
-                renamed = replace_authorities(authorities)
+                renamed = replace_authorities(authorities, new_package)
                 if renamed != authorities:
                     element.set(authorities_key, renamed)
                     stats["authorities"] += 1
@@ -86,7 +94,7 @@ def patch_manifest(path: str | Path) -> dict[str, int]:
         affinity_key = ANDROID + "taskAffinity"
         affinity = element.get(affinity_key)
         if affinity:
-            renamed = replace_prefix(affinity)
+            renamed = replace_prefix(affinity, new_package)
             if renamed != affinity:
                 element.set(affinity_key, renamed)
                 stats["task_affinities"] += 1
@@ -99,8 +107,15 @@ def main() -> None:
     """Patch the manifest path supplied on the command line and print change counts."""
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest", type=Path)
+    parser.add_argument("--new-package", default=NEW_PACKAGE)
+    parser.add_argument("--app-label", default=None)
     args = parser.parse_args()
-    print(json.dumps(patch_manifest(args.manifest), sort_keys=True))
+    print(
+        json.dumps(
+            patch_manifest(args.manifest, new_package=args.new_package, app_label=args.app_label),
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":
