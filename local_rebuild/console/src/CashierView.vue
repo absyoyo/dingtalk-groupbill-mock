@@ -52,12 +52,15 @@ const payerRows = computed(() => {
     uid: String(item.uid),
     amount: item.amount,
     payStatus: item.payStatus,
+    // 真实钉钉语义（实测取证）：创建账单时所有条目 payStatus=1 且无人支付，
+    // 即 1=待支付；已支付为 2（尚未观测到真实样本，按枚举惯例处理）
+    paid: String(item.payStatus) === '2',
     hasPayUrl: latest.has(String(item.uid)),
   }))
 })
 
 const selectedRow = computed(() => payerRows.value.find((r) => r.uid === selectedPayer.value) || null)
-const paidCount = computed(() => payerRows.value.filter((r) => r.payStatus === 1).length)
+const paidCount = computed(() => payerRows.value.filter((r) => r.paid).length)
 
 async function load() {
   loading.value = true
@@ -70,7 +73,7 @@ async function load() {
       return
     }
     detail.value = data
-    const firstUnpaid = payerRows.value.find((r) => r.payStatus !== 1 && r.hasPayUrl)
+    const firstUnpaid = payerRows.value.find((r) => !r.paid && r.hasPayUrl)
     const fallback = payerRows.value.find((r) => r.hasPayUrl)
     selectedPayer.value = (firstUnpaid || fallback || payerRows.value[0])?.uid || ''
   } catch (err) {
@@ -173,9 +176,10 @@ onMounted(async () => {
               <span>UID {{ row.uid }}</span>
               <span>
                 <b>¥{{ row.amount }}</b>
-                <el-tag v-if="row.payStatus === 1" type="success" size="small" style="margin-left:6px">已支付</el-tag>
+                <el-tag v-if="row.paid" type="success" size="small" style="margin-left:6px">已支付</el-tag>
+                <el-tag v-else-if="String(row.payStatus) === '1'" type="warning" size="small" style="margin-left:6px">待支付</el-tag>
                 <el-tag v-else-if="!row.hasPayUrl" type="info" size="small" style="margin-left:6px">无支付链接</el-tag>
-                <el-tag v-else type="warning" size="small" style="margin-left:6px">待支付</el-tag>
+                <el-tag v-else type="info" size="small" style="margin-left:6px">状态{{ row.payStatus }}</el-tag>
               </span>
             </div>
           </el-radio>
@@ -186,7 +190,7 @@ onMounted(async () => {
           size="large"
           style="width:100%; margin-top:20px"
           :loading="paying"
-          :disabled="!selectedRow || selectedRow.payStatus === 1 || !selectedRow.hasPayUrl"
+          :disabled="!selectedRow || selectedRow.paid || !selectedRow.hasPayUrl"
           @click="pay"
         >
           {{ isMobile ? '立即支付（唤起支付宝）' : '生成支付二维码' }}
