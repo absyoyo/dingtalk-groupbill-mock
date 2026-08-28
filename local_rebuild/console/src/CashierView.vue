@@ -88,11 +88,17 @@ function latestPayUrl(uid) {
 }
 
 async function pay() {
+  window.__paylog = window.__paylog || []
+  const L = (m) => { window.__paylog.push(m); console.log('[pay]', m) }
+  L('invoked')
   const row = selectedRow.value
+  L('row=' + JSON.stringify(row))
   if (!row) return ElMessage.warning('请先选择付款人')
   const payUrl = latestPayUrl(row.uid)
+  L('payUrl len=' + (payUrl || '').length)
   if (!payUrl) return ElMessage.warning('该付款人还没有支付链接，请先在控制台「拉支付链接」')
   paying.value = true
+  L('paying=true, isMobile=' + isMobile)
   try {
     if (isMobile) {
       // 手机：直接唤起支付宝客户端收银台
@@ -101,9 +107,14 @@ async function pay() {
     } else {
       // PC：展示 scheme 二维码，手机支付宝扫码拉起收银台
       payLink.value = buildAlipayScheme(payUrl)
+      L('calling QRCode.toDataURL, typeof=' + typeof QRCode?.toDataURL)
       qrDataUrl.value = await QRCode.toDataURL(payLink.value, { width: 240, margin: 1 })
+      L('QR done len=' + qrDataUrl.value.length)
       ElMessage.success('请用手机支付宝扫描二维码完成支付')
     }
+  } catch (e) {
+    L('EXC: ' + (e && e.message))
+    throw e
   } finally {
     paying.value = false
   }

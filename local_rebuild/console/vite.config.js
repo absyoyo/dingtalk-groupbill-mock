@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, 'index.html'),
         cashier: resolve(__dirname, 'cashier.html'),
+        qrtest: resolve(__dirname, 'qrtest.html'),
       },
     },
   },
