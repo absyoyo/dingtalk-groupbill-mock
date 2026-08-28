@@ -26,6 +26,56 @@ const steps = [
     </el-card>
 
     <el-card shadow="never" style="margin-bottom: 16px">
+      <template #header><b>手机端操作（必读）</b></template>
+      <el-alert type="error" :closable="false" style="margin-bottom: 12px">
+        <template #title>三条红线</template>
+        ① 这是<strong>真实扣款</strong>，不是模拟；② 克隆包仅用于测试，别当日常钉钉用；③ 别在同一手机短时间连点两笔「立即支付」。
+      </el-alert>
+
+      <el-divider content-position="left">A. 安装与启动</el-divider>
+      <ol class="ol">
+        <li>把 <code>dingtalk-localtest.apk</code> 传到手机安装（可用 <code>adb install</code> 或文件管理器）。</li>
+        <li>首次打开，登录测试账号。</li>
+        <li>系统弹「通知已关闭」「悬浮窗权限」等提示，按引导允许即可（悬浮窗用于顶部状态条）。</li>
+      </ol>
+
+      <el-divider content-position="left">B. 二次唤醒（最关键，漏了设备不上线）</el-divider>
+      <el-alert type="warning" :closable="false" style="margin-bottom: 8px">
+        钩子只在<b>第二次 onResume</b> 才连服务器。装完打开一次不算。
+      </el-alert>
+      <ol class="ol">
+        <li>打开克隆钉钉（停留在首页）。</li>
+        <li>按 <b>Home 键</b>回桌面。</li>
+        <li>再点图标切回克隆钉钉。</li>
+        <li>看顶部是否出现绿色状态条「V2.x-test … 在线」；控制台「设备管理」应出现你的 uid。</li>
+      </ol>
+
+      <el-divider content-position="left">C. 在群里发起收款</el-divider>
+      <ol class="ol">
+        <li>进目标群 → 点输入框旁「+」→ 选「群收款」。</li>
+        <li>填金额、选人（可均分 / 指定人）、填备注，发起。</li>
+        <li>发起后控制台「订单查询」会出现这笔账单（状态「待拉链接」）。</li>
+      </ol>
+
+      <el-divider content-position="left">D. 付款</el-divider>
+      <ol class="ol">
+        <li>控制台把这笔「拉支付链接」→ 状态变「已拉链接」。</li>
+        <li>手机浏览器打开收银台链接（或 PC 生成二维码用手机扫）。</li>
+        <li>点「立即支付」→ 唤起支付宝 → 核对金额 → 输密码。</li>
+        <li>付完回控制台强刷，订单变「已付款」。</li>
+      </ol>
+
+      <el-divider content-position="left">E. 手机端注意事项</el-divider>
+      <ul class="ul">
+        <li><b>账号互踢</b>：克隆包和正式版钉钉不要同时登同一个号，会互相挤掉。</li>
+        <li><b>别连点</b>：一笔付完再付下一笔；同时点两笔可能串单。</li>
+        <li><b>群收款页打不开/白屏</b>：说明 APK 没带 UC 绕过，需重新构建（加 <code>--uc-auth-bypass</code>）。</li>
+        <li><b>付了款订单没变</b>：在钉钉里打开那笔账单让它同步一次，再看控制台。</li>
+        <li><b>换手机/重装</b>：要重新做一遍「二次唤醒」，并重新 enroll 拿密钥。</li>
+      </ul>
+    </el-card>
+
+    <el-card shadow="never" style="margin-bottom: 16px">
       <template #header><b>1. 控制台首页</b></template>
       <p class="hint">左侧菜单：设备 → 收款指令 → 事件流 → 订单查询 → 日志 → API → 本教程。</p>
       <img class="shot" src="/guide/01_console.png" alt="控制台首页：设备管理" />
