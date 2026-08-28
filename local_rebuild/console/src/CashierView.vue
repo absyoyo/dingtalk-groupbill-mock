@@ -48,15 +48,29 @@ function latestPayUrlByPayer() {
   return latest
 }
 
+// mark_paid 上报（pay_id = "{billId}_{payerUid}"）→ 已付款人集合
+function markPaidUids() {
+  const paid = new Set()
+  for (const event of detail.value?.events || []) {
+    if (event.type !== '/api/device/mark_paid') continue
+    const payId = event.payload?.pay_id || ''
+    if (payId.startsWith(`${billId}_`)) {
+      paid.add(payId.slice(billId.length + 1))
+    }
+  }
+  return paid
+}
+
 const payerRows = computed(() => {
   const latest = latestPayUrlByPayer()
+  const markPaid = markPaidUids()
   return items.value.map((item) => ({
     uid: String(item.uid),
     amount: item.amount,
     payStatus: item.payStatus,
-    // 真实钉钉语义（实测取证）：创建账单时所有条目 payStatus=1 且无人支付，
-    // 即 1=待支付；已支付为 2（尚未观测到真实样本，按枚举惯例处理）
-    paid: String(item.payStatus) === '2',
+    // 已支付判定：payStatus=2（真实枚举，尚未观测到样本）或手机端上报过
+    // mark_paid（pay_id 命中该付款人）——mark_paid 是实测可靠的支付凭证
+    paid: String(item.payStatus) === '2' || markPaid.has(String(item.uid)),
     hasPayUrl: latest.has(String(item.uid)),
   }))
 })

@@ -901,7 +901,8 @@ def create_app(event_log_path: str | Path) -> FastAPI:
             if not bid or bid in seen:
                 continue
             seen.add(bid)
-            status = "paid" if bid in paid_seen or any(p.endswith(bid) for p in paid_seen) else (
+            # pay_id 格式为 "{groupBillId}_{payerUid}"，以账单 ID 开头
+            status = "paid" if bid in paid_seen or any(p.startswith(bid + "_") for p in paid_seen) else (
                 "link_fetched" if bid in pay_url_seen else "pending"
             )
             bills.append({
@@ -928,7 +929,11 @@ def create_app(event_log_path: str | Path) -> FastAPI:
         for event in history:
             data = event.get("payload", {}).get("data", event.get("payload", {}))
             bid = data.get("groupBillId") if isinstance(data, dict) else ""
-            if bid != group_bill_id and not _bill_matches(event, group_bill_id):
+            is_mark_paid = (
+                event["type"] == "/api/device/mark_paid"
+                and event.get("payload", {}).get("pay_id", "").startswith(f"{group_bill_id}_")
+            )
+            if bid != group_bill_id and not _bill_matches(event, group_bill_id) and not is_mark_paid:
                 continue
             related.append(event)
             if event["type"] == "bill.upsert" and event["direction"] == "in" and upsert is None:
