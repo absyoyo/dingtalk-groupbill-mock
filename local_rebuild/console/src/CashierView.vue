@@ -63,12 +63,13 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const { status, body } = await fetchBillDetail(billId)
-    if (status !== 200 || body.code !== 0) {
-      loadError.value = body.msg || `加载失败 (HTTP ${status})`
+    // fetchBillDetail 返回 body.data（数据本身）或 null
+    const data = await fetchBillDetail(billId)
+    if (!data) {
+      loadError.value = '账单不存在或加载失败'
       return
     }
-    detail.value = body.data
+    detail.value = data
     const firstUnpaid = payerRows.value.find((r) => r.payStatus !== 1 && r.hasPayUrl)
     const fallback = payerRows.value.find((r) => r.hasPayUrl)
     selectedPayer.value = (firstUnpaid || fallback || payerRows.value[0])?.uid || ''
@@ -110,7 +111,8 @@ async function probe() {
   if (!row) return
   probing.value = true
   try {
-    const { body } = await queryPayStatus({ groupBillId: billId, payerUid: row.uid })
+    // 后端 CollectRequest 参数：groupBillId + targetUid
+    const { body } = await queryPayStatus({ groupBillId: billId, targetUid: row.uid })
     if (body.code === 0) {
       ElMessage.success('已发起支付状态查询，正在刷新…')
       await load()
