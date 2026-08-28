@@ -106,6 +106,14 @@ class TestEnroll:
         )
         assert store.secret_b64(r2["device_id"]) == __import__("base64").b64encode(latest).decode()
 
+    def test_enroll_persists_across_reload(self, tmp_path, device_rsa: rsa.RSAPrivateKey) -> None:
+        path = tmp_path / "device-keys.json"
+        store = DeviceKeyStore(path)
+        rec = store.enroll("199504987", "198716", _device_public_pem(device_rsa))
+        reloaded = DeviceKeyStore(path)
+        assert reloaded.secret_b64(rec["device_id"]) == store.secret_b64(rec["device_id"])
+        assert reloaded.device_id_for_user("199504987") == rec["device_id"]
+
     def test_rejects_bad_device_key(self, store: DeviceKeyStore) -> None:
         with pytest.raises(SignVerifyError):
             store.enroll("199504987", "198716", "not-a-pem")

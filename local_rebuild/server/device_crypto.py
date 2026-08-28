@@ -132,11 +132,11 @@ class DeviceKeyStore:
     def _load(self) -> None:
         if not self.path.exists():
             self._data: dict[str, Any] = {"server_key": None, "devices": {}}
-            return
-        try:
-            self._data = json.loads(self.path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            self._data = {"server_key": None, "devices": {}}
+        else:
+            try:
+                self._data = json.loads(self.path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                self._data = {"server_key": None, "devices": {}}
         self._devices = self._data.setdefault("devices", {})
 
     def _save(self) -> None:
