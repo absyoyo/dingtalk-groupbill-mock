@@ -22,6 +22,7 @@ from starlette.websockets import WebSocketDisconnect
 from local_rebuild.server.device_crypto import DeviceKeyStore, SignVerifyError, decrypt_hybrid
 from local_rebuild.server.event_hub import EventHub
 from local_rebuild.server.event_log import EventLog
+from local_rebuild.server.webhook_forwarder import WebhookForwarder
 
 
 _API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -464,6 +465,12 @@ def create_app(event_log_path: str | Path) -> FastAPI:
     app.state.device_keys = DeviceKeyStore(app.state.event_log_path.parent / "device-keys.json")
     # 设备上报签名强制开关：1=未签名/验签失败一律 401；默认 log-only（照收并记录安全事件）
     app.state.device_sign_enforce = os.environ.get("DEVICE_SIGN_ENFORCE", "").strip() == "1"
+    # PHP 插件（dingtalk_groupbill）出站 webhook：DDGB_WEBHOOK_URL/SECRET 都配置才启用
+    app.state.ddgb_webhook = WebhookForwarder(
+        url=os.environ.get("DDGB_WEBHOOK_URL", ""),
+        secret=os.environ.get("DDGB_WEBHOOK_SECRET", ""),
+    )
+    app.state.ddgb_webhook.start()
     app.state.collect_logs_path = app.state.event_log_path.parent / "collect-logs.jsonl"
     logcat_log = app.state.event_log_path.parent / "device-logcat.log"
     app.state.logcat_log_path = logcat_log
@@ -496,6 +503,7 @@ def create_app(event_log_path: str | Path) -> FastAPI:
         }
         app.state.event_log.append_record(event)
         app.state.event_hub.publish(event)
+        app.state.ddgb_webhook.submit(event)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError):
