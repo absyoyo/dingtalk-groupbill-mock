@@ -112,6 +112,7 @@ class ActiveWebSocket:
     connection_id: str
     user_id: str = ""
     account_id: str = ""
+    nick: str = ""
     connected_at: float = 0.0
     last_ping_at: float = 0.0
 
@@ -128,7 +129,7 @@ class ConnectionManager:
         self.devices: dict[str, ActiveWebSocket] = {}
         self._lock = asyncio.Lock()
 
-    async def register(self, websocket: WebSocket, connection_id: str, user_id: str, account_id: str = "") -> None:
+    async def register(self, websocket: WebSocket, connection_id: str, user_id: str, account_id: str = "", nick: str = "") -> None:
         """Associate *websocket* with *user_id* in the device map.
 
         If *user_id* already has a different registered socket, that old
@@ -140,6 +141,7 @@ class ConnectionManager:
             connection_id=connection_id,
             user_id=user_id,
             account_id=account_id,
+            nick=nick,
             connected_at=time.time(),
         )
         async with self._lock:
@@ -726,8 +728,9 @@ def create_app(event_log_path: str | Path) -> FastAPI:
                     data = envelope.get("data", {})
                     user_id: str = data.get("userId", "") if isinstance(data, dict) else ""
                     account_id: str = data.get("accountId", "") if isinstance(data, dict) else ""
+                    nick: str = data.get("nick", "") if isinstance(data, dict) else ""
                     ws_user_id = user_id
-                    await manager.register(ws, connection_id, user_id, account_id)
+                    await manager.register(ws, connection_id, user_id, account_id, nick)
                     ack = {
                         "type": "ack",
                         "data": {"message": "registered", "userId": user_id, "pendingTasks": 0},
@@ -843,6 +846,7 @@ def create_app(event_log_path: str | Path) -> FastAPI:
             devices.append({
                 "userId": record.user_id,
                 "accountId": record.account_id,
+                "nick": record.nick,
                 "connectionId": record.connection_id,
                 "connectedAt": record.connected_at,
                 "lastPingAt": record.last_ping_at,

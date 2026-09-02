@@ -18,6 +18,8 @@
 
 .field private static hmacSecret:[B
 
+.field private static nickName:Ljava/lang/String;
+
 .field private static serverPublicKey:Ljava/security/PublicKey;
 
 .field private static userId:Ljava/lang/String;
@@ -58,6 +60,9 @@
     sput-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->accountId:Ljava/lang/String;
 
     .line 50
+    sput-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->nickName:Ljava/lang/String;
+
+    .line 51
     sput-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->deviceId:Ljava/lang/String;
 
     return-void
@@ -66,7 +71,7 @@
 .method private constructor <init>()V
     .registers 1
 
-    .line 56
+    .line 57
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
@@ -80,7 +85,7 @@
         }
     .end annotation
 
-    .line 196
+    .line 249
     invoke-static {}, Ljava/lang/System;->currentTimeMillis()J
 
     move-result-wide v0
@@ -89,7 +94,7 @@
 
     div-long/2addr v0, v2
 
-    .line 197
+    .line 250
     invoke-static {}, Ljava/util/UUID;->randomUUID()Ljava/util/UUID;
 
     move-result-object v2
@@ -106,14 +111,14 @@
 
     move-result-object v2
 
-    .line 198
+    .line 251
     const-string v3, "SHA-256"
 
     invoke-static {v3}, Ljava/security/MessageDigest;->getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;
 
     move-result-object v3
 
-    .line 199
+    .line 252
     invoke-virtual {v3, p3}, Ljava/security/MessageDigest;->digest([B)[B
 
     move-result-object p3
@@ -122,7 +127,7 @@
 
     move-result-object p3
 
-    .line 200
+    .line 253
     new-instance v3, Ljava/lang/StringBuilder;
 
     invoke-direct {v3}, Ljava/lang/StringBuilder;-><init>()V
@@ -173,14 +178,14 @@
 
     move-result-object p1
 
-    .line 201
+    .line 254
     const-string p2, "HmacSHA256"
 
     invoke-static {p2}, Ljavax/crypto/Mac;->getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;
 
     move-result-object p3
 
-    .line 202
+    .line 255
     new-instance v3, Ljavax/crypto/spec/SecretKeySpec;
 
     sget-object v4, Lcom/dingtalk/groupbill/net/CryptoBox;->hmacSecret:[B
@@ -189,7 +194,7 @@
 
     invoke-virtual {p3, v3}, Ljavax/crypto/Mac;->init(Ljava/security/Key;)V
 
-    .line 203
+    .line 256
     sget-object p2, Ljava/nio/charset/StandardCharsets;->UTF_8:Ljava/nio/charset/Charset;
 
     invoke-virtual {p1, p2}, Ljava/lang/String;->getBytes(Ljava/nio/charset/Charset;)[B
@@ -204,14 +209,14 @@
 
     move-result-object p1
 
-    .line 204
+    .line 257
     const-string p2, "X-Device-Id"
 
     sget-object p3, Lcom/dingtalk/groupbill/net/CryptoBox;->deviceId:Ljava/lang/String;
 
     invoke-virtual {p0, p2, p3}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
 
-    .line 205
+    .line 258
     const-string p2, "X-Timestamp"
 
     invoke-static {v0, v1}, Ljava/lang/String;->valueOf(J)Ljava/lang/String;
@@ -220,17 +225,17 @@
 
     invoke-virtual {p0, p2, p3}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
 
-    .line 206
+    .line 259
     const-string p2, "X-Nonce"
 
     invoke-virtual {p0, p2, v2}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
 
-    .line 207
+    .line 260
     const-string p2, "X-Sign"
 
     invoke-virtual {p0, p2, p1}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
 
-    .line 208
+    .line 261
     return-void
 .end method
 
@@ -242,14 +247,14 @@
         }
     .end annotation
 
-    .line 145
+    .line 198
     const-string v0, "RSA"
 
     invoke-static {v0}, Ljava/security/KeyPairGenerator;->getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;
 
     move-result-object v1
 
-    .line 146
+    .line 199
     new-instance v2, Ljava/security/SecureRandom;
 
     invoke-direct {v2}, Ljava/security/SecureRandom;-><init>()V
@@ -258,19 +263,19 @@
 
     invoke-virtual {v1, v3, v2}, Ljava/security/KeyPairGenerator;->initialize(ILjava/security/SecureRandom;)V
 
-    .line 147
+    .line 200
     invoke-virtual {v1}, Ljava/security/KeyPairGenerator;->generateKeyPair()Ljava/security/KeyPair;
 
     move-result-object v1
 
-    .line 148
+    .line 201
     invoke-virtual {v1}, Ljava/security/KeyPair;->getPrivate()Ljava/security/PrivateKey;
 
     move-result-object v2
 
     sput-object v2, Lcom/dingtalk/groupbill/net/CryptoBox;->devicePrivateKey:Ljava/security/PrivateKey;
 
-    .line 149
+    .line 202
     invoke-virtual {v1}, Ljava/security/KeyPair;->getPublic()Ljava/security/PublicKey;
 
     move-result-object v1
@@ -285,31 +290,31 @@
 
     move-result-object v1
 
-    .line 151
+    .line 204
     new-instance v2, Lorg/json/JSONObject;
 
     invoke-direct {v2}, Lorg/json/JSONObject;-><init>()V
 
-    .line 152
+    .line 205
     const-string v3, "userId"
 
     sget-object v4, Lcom/dingtalk/groupbill/net/CryptoBox;->userId:Ljava/lang/String;
 
     invoke-virtual {v2, v3, v4}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
 
-    .line 153
+    .line 206
     const-string v3, "accountId"
 
     sget-object v4, Lcom/dingtalk/groupbill/net/CryptoBox;->accountId:Ljava/lang/String;
 
     invoke-virtual {v2, v3, v4}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
 
-    .line 154
+    .line 207
     const-string v3, "devicePublicKey"
 
     invoke-virtual {v2, v3, v1}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
 
-    .line 155
+    .line 208
     const-string v1, "/api/device/enroll"
 
     invoke-virtual {v2}, Lorg/json/JSONObject;->toString()Ljava/lang/String;
@@ -320,12 +325,12 @@
 
     move-result-object v1
 
-    .line 156
+    .line 209
     new-instance v2, Lorg/json/JSONObject;
 
     invoke-direct {v2, v1}, Lorg/json/JSONObject;-><init>(Ljava/lang/String;)V
 
-    .line 157
+    .line 210
     const/4 v1, -0x1
 
     const-string v3, "code"
@@ -336,14 +341,14 @@
 
     if-nez v1, :cond_a1
 
-    .line 160
+    .line 213
     const-string v1, "data"
 
     invoke-virtual {v2, v1}, Lorg/json/JSONObject;->getJSONObject(Ljava/lang/String;)Lorg/json/JSONObject;
 
     move-result-object v1
 
-    .line 161
+    .line 214
     const-string v2, "device_id"
 
     invoke-virtual {v1, v2}, Lorg/json/JSONObject;->getString(Ljava/lang/String;)Ljava/lang/String;
@@ -352,28 +357,28 @@
 
     sput-object v2, Lcom/dingtalk/groupbill/net/CryptoBox;->deviceId:Ljava/lang/String;
 
-    .line 162
+    .line 215
     const-string v2, "enc_hmac_secret"
 
     invoke-virtual {v1, v2}, Lorg/json/JSONObject;->getString(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v2
 
-    .line 163
+    .line 216
     const-string v3, "server_public_key"
 
     invoke-virtual {v1, v3}, Lorg/json/JSONObject;->getString(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v1
 
-    .line 165
+    .line 218
     const-string v3, "RSA/ECB/OAEPPadding"
 
     invoke-static {v3}, Ljavax/crypto/Cipher;->getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;
 
     move-result-object v3
 
-    .line 166
+    .line 219
     sget-object v4, Lcom/dingtalk/groupbill/net/CryptoBox;->devicePrivateKey:Ljava/security/PrivateKey;
 
     sget-object v5, Lcom/dingtalk/groupbill/net/CryptoBox;->OAEP:Ljavax/crypto/spec/OAEPParameterSpec;
@@ -382,7 +387,7 @@
 
     invoke-virtual {v3, v6, v4, v5}, Ljavax/crypto/Cipher;->init(ILjava/security/Key;Ljava/security/spec/AlgorithmParameterSpec;)V
 
-    .line 167
+    .line 220
     invoke-static {v2}, Lcom/dingtalk/groupbill/net/CryptoBox;->fromB64(Ljava/lang/String;)[B
 
     move-result-object v2
@@ -393,36 +398,36 @@
 
     sput-object v2, Lcom/dingtalk/groupbill/net/CryptoBox;->hmacSecret:[B
 
-    .line 168
+    .line 221
     invoke-static {v0}, Ljava/security/KeyFactory;->getInstance(Ljava/lang/String;)Ljava/security/KeyFactory;
 
     move-result-object v0
 
     new-instance v2, Ljava/security/spec/X509EncodedKeySpec;
 
-    .line 169
+    .line 222
     invoke-static {v1}, Lcom/dingtalk/groupbill/net/CryptoBox;->fromPem(Ljava/lang/String;)[B
 
     move-result-object v1
 
     invoke-direct {v2, v1}, Ljava/security/spec/X509EncodedKeySpec;-><init>([B)V
 
-    .line 168
+    .line 221
     invoke-virtual {v0, v2}, Ljava/security/KeyFactory;->generatePublic(Ljava/security/spec/KeySpec;)Ljava/security/PublicKey;
 
     move-result-object v0
 
     sput-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->serverPublicKey:Ljava/security/PublicKey;
 
-    .line 170
+    .line 223
     const/4 v0, 0x1
 
     sput-boolean v0, Lcom/dingtalk/groupbill/net/CryptoBox;->enrolled:Z
 
-    .line 171
+    .line 224
     return-void
 
-    .line 158
+    .line 211
     :cond_a1
     new-instance v0, Ljava/lang/IllegalStateException;
 
@@ -461,14 +466,14 @@
         }
     .end annotation
 
-    .line 174
+    .line 227
     const-string v0, "AES"
 
     invoke-static {v0}, Ljavax/crypto/KeyGenerator;->getInstance(Ljava/lang/String;)Ljavax/crypto/KeyGenerator;
 
     move-result-object v0
 
-    .line 175
+    .line 228
     new-instance v1, Ljava/security/SecureRandom;
 
     invoke-direct {v1}, Ljava/security/SecureRandom;-><init>()V
@@ -477,31 +482,31 @@
 
     invoke-virtual {v0, v2, v1}, Ljavax/crypto/KeyGenerator;->init(ILjava/security/SecureRandom;)V
 
-    .line 176
+    .line 229
     invoke-virtual {v0}, Ljavax/crypto/KeyGenerator;->generateKey()Ljavax/crypto/SecretKey;
 
     move-result-object v0
 
-    .line 177
+    .line 230
     const/16 v1, 0xc
 
     new-array v1, v1, [B
 
-    .line 178
+    .line 231
     new-instance v2, Ljava/security/SecureRandom;
 
     invoke-direct {v2}, Ljava/security/SecureRandom;-><init>()V
 
     invoke-virtual {v2, v1}, Ljava/security/SecureRandom;->nextBytes([B)V
 
-    .line 179
+    .line 232
     const-string v2, "AES/GCM/NoPadding"
 
     invoke-static {v2}, Ljavax/crypto/Cipher;->getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;
 
     move-result-object v2
 
-    .line 180
+    .line 233
     new-instance v3, Ljavax/crypto/spec/GCMParameterSpec;
 
     const/16 v4, 0x80
@@ -512,26 +517,26 @@
 
     invoke-virtual {v2, v4, v0, v3}, Ljavax/crypto/Cipher;->init(ILjava/security/Key;Ljava/security/spec/AlgorithmParameterSpec;)V
 
-    .line 181
+    .line 234
     invoke-virtual {v2, p0}, Ljavax/crypto/Cipher;->doFinal([B)[B
 
     move-result-object p0
 
-    .line 183
+    .line 236
     const-string v2, "RSA/ECB/OAEPPadding"
 
     invoke-static {v2}, Ljavax/crypto/Cipher;->getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;
 
     move-result-object v2
 
-    .line 184
+    .line 237
     sget-object v3, Lcom/dingtalk/groupbill/net/CryptoBox;->serverPublicKey:Ljava/security/PublicKey;
 
     sget-object v5, Lcom/dingtalk/groupbill/net/CryptoBox;->OAEP:Ljavax/crypto/spec/OAEPParameterSpec;
 
     invoke-virtual {v2, v4, v3, v5}, Ljavax/crypto/Cipher;->init(ILjava/security/Key;Ljava/security/spec/AlgorithmParameterSpec;)V
 
-    .line 185
+    .line 238
     invoke-interface {v0}, Ljavax/crypto/SecretKey;->getEncoded()[B
 
     move-result-object v0
@@ -540,12 +545,12 @@
 
     move-result-object v0
 
-    .line 187
+    .line 240
     new-instance v2, Lorg/json/JSONObject;
 
     invoke-direct {v2}, Lorg/json/JSONObject;-><init>()V
 
-    .line 188
+    .line 241
     const-string v3, "ek"
 
     invoke-static {v0}, Lcom/dingtalk/groupbill/net/CryptoBox;->toB64([B)Ljava/lang/String;
@@ -554,7 +559,7 @@
 
     invoke-virtual {v2, v3, v0}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
 
-    .line 189
+    .line 242
     const-string v0, "iv"
 
     invoke-static {v1}, Lcom/dingtalk/groupbill/net/CryptoBox;->toB64([B)Ljava/lang/String;
@@ -563,7 +568,7 @@
 
     invoke-virtual {v2, v0, v1}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
 
-    .line 190
+    .line 243
     const-string v0, "ct"
 
     invoke-static {p0}, Lcom/dingtalk/groupbill/net/CryptoBox;->toB64([B)Ljava/lang/String;
@@ -572,19 +577,19 @@
 
     invoke-virtual {v2, v0, p0}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
 
-    .line 191
+    .line 244
     return-object v2
 .end method
 
 .method public static ensureEnrolled()V
     .registers 9
 
-    .line 72
+    .line 111
     sget-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->LOCK:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 73
+    .line 112
     :try_start_3
     sget-boolean v1, Lcom/dingtalk/groupbill/net/CryptoBox;->enrolled:Z
 
@@ -602,21 +607,21 @@
 
     goto :goto_3e
 
-    .line 77
+    .line 116
     :cond_10
     :try_start_10
     invoke-static {}, Lcom/dingtalk/groupbill/net/CryptoBox;->doEnrollLocked()V
     :try_end_13
     .catchall {:try_start_10 .. :try_end_13} :catchall_14
 
-    .line 86
+    .line 125
     goto :goto_3c
 
-    .line 78
+    .line 117
     :catchall_14
     move-exception v1
 
-    .line 80
+    .line 119
     :try_start_15
     const-string v2, "com.dingtalk.groupbill.util.DtLog"
 
@@ -642,7 +647,7 @@
 
     aput-object v6, v5, v8
 
-    .line 81
+    .line 120
     invoke-virtual {v2, v3, v5}, Ljava/lang/Class;->getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
 
     move-result-object v2
@@ -655,36 +660,36 @@
 
     aput-object v1, v3, v8
 
-    .line 82
+    .line 121
     const/4 v1, 0x0
 
     invoke-virtual {v2, v1, v3}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
     :try_end_3a
     .catchall {:try_start_15 .. :try_end_3a} :catchall_3b
 
-    .line 85
+    .line 124
     goto :goto_3c
 
-    .line 83
+    .line 122
     :catchall_3b
     move-exception v1
 
-    .line 87
+    .line 126
     :goto_3c
     :try_start_3c
     monitor-exit v0
 
-    .line 88
+    .line 127
     return-void
 
-    .line 74
+    .line 113
     :cond_3e
     :goto_3e
     monitor-exit v0
 
     return-void
 
-    .line 87
+    .line 126
     :catchall_40
     move-exception v1
 
@@ -695,10 +700,143 @@
     throw v1
 .end method
 
+.method private static fetchNick()V
+    .registers 5
+
+    .line 83
+    :try_start_0
+    const-string v0, "com.alibaba.android.dingtalk.userbase.UserEngineInterface"
+
+    invoke-static {v0}, Ljava/lang/Class;->forName(Ljava/lang/String;)Ljava/lang/Class;
+
+    move-result-object v0
+
+    .line 84
+    const-string v1, "f"
+
+    const/4 v2, 0x0
+
+    new-array v3, v2, [Ljava/lang/Class;
+
+    invoke-virtual {v0, v1, v3}, Ljava/lang/Class;->getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
+
+    move-result-object v1
+
+    new-array v3, v2, [Ljava/lang/Object;
+
+    const/4 v4, 0x0
+
+    invoke-virtual {v1, v4, v3}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object v1
+
+    .line 85
+    if-nez v1, :cond_19
+
+    .line 86
+    return-void
+
+    .line 88
+    :cond_19
+    const-string v3, "e"
+
+    new-array v4, v2, [Ljava/lang/Class;
+
+    invoke-virtual {v0, v3, v4}, Ljava/lang/Class;->getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
+
+    move-result-object v0
+
+    new-array v2, v2, [Ljava/lang/Object;
+
+    invoke-virtual {v0, v1, v2}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    .line 89
+    if-nez v0, :cond_2a
+
+    .line 90
+    return-void
+
+    .line 92
+    :cond_2a
+    invoke-virtual {v0}, Ljava/lang/Object;->getClass()Ljava/lang/Class;
+
+    move-result-object v1
+
+    const-string v2, "nick"
+
+    invoke-virtual {v1, v2}, Ljava/lang/Class;->getField(Ljava/lang/String;)Ljava/lang/reflect/Field;
+
+    move-result-object v1
+
+    invoke-virtual {v1, v0}, Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    .line 93
+    instance-of v1, v0, Ljava/lang/String;
+
+    if-eqz v1, :cond_51
+
+    move-object v1, v0
+
+    check-cast v1, Ljava/lang/String;
+
+    invoke-virtual {v1}, Ljava/lang/String;->isEmpty()Z
+
+    move-result v1
+
+    if-nez v1, :cond_51
+
+    .line 94
+    sget-object v1, Lcom/dingtalk/groupbill/net/CryptoBox;->LOCK:Ljava/lang/Object;
+
+    monitor-enter v1
+    :try_end_48
+    .catchall {:try_start_0 .. :try_end_48} :catchall_52
+
+    .line 95
+    :try_start_48
+    check-cast v0, Ljava/lang/String;
+
+    sput-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->nickName:Ljava/lang/String;
+
+    .line 96
+    monitor-exit v1
+
+    goto :goto_51
+
+    :catchall_4e
+    move-exception v0
+
+    monitor-exit v1
+    :try_end_50
+    .catchall {:try_start_48 .. :try_end_50} :catchall_4e
+
+    :try_start_50
+    throw v0
+    :try_end_51
+    .catchall {:try_start_50 .. :try_end_51} :catchall_52
+
+    .line 100
+    :cond_51
+    :goto_51
+    goto :goto_53
+
+    .line 98
+    :catchall_52
+    move-exception v0
+
+    .line 101
+    :goto_53
+    return-void
+.end method
+
 .method private static fromB64(Ljava/lang/String;)[B
     .registers 10
 
-    .line 286
+    .line 339
     const-string v0, "[^A-Za-z0-9+/=]"
 
     const-string v1, ""
@@ -707,7 +845,7 @@
 
     move-result-object p0
 
-    .line 287
+    .line 340
     const-string v0, "=="
 
     invoke-virtual {p0, v0}, Ljava/lang/String;->endsWith(Ljava/lang/String;)Z
@@ -738,7 +876,7 @@
     :cond_1d
     const/4 v0, 0x0
 
-    .line 288
+    .line 341
     :goto_1e
     invoke-virtual {p0}, Ljava/lang/String;->length()I
 
@@ -750,39 +888,39 @@
 
     sub-int/2addr v2, v0
 
-    .line 289
+    .line 342
     invoke-static {v2, v1}, Ljava/lang/Math;->max(II)I
 
     move-result v0
 
     new-array v2, v0, [B
 
-    .line 290
+    .line 343
     const/16 v3, 0x80
 
     new-array v4, v3, [I
 
-    .line 291
+    .line 344
     const/4 v5, 0x0
 
     :goto_32
     if-ge v5, v3, :cond_3a
 
-    .line 292
+    .line 345
     const/4 v6, -0x1
 
     aput v6, v4, v5
 
-    .line 291
+    .line 344
     add-int/lit8 v5, v5, 0x1
 
     goto :goto_32
 
-    .line 294
+    .line 347
     :cond_3a
     nop
 
-    .line 295
+    .line 348
     const/4 v3, 0x0
 
     :goto_3c
@@ -790,7 +928,7 @@
 
     if-ge v3, v5, :cond_4b
 
-    .line 296
+    .line 349
     const-string v5, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
     invoke-virtual {v5, v3}, Ljava/lang/String;->charAt(I)C
@@ -799,16 +937,16 @@
 
     aput v3, v4, v5
 
-    .line 295
+    .line 348
     add-int/lit8 v3, v3, 0x1
 
     goto :goto_3c
 
-    .line 298
+    .line 351
     :cond_4b
     nop
 
-    .line 299
+    .line 352
     const/4 v3, 0x0
 
     const/4 v5, 0x0
@@ -822,7 +960,7 @@
 
     if-ge v6, v7, :cond_a2
 
-    .line 300
+    .line 353
     invoke-virtual {p0, v3}, Ljava/lang/String;->charAt(I)C
 
     move-result v7
@@ -845,7 +983,7 @@
 
     add-int/lit8 v8, v3, 0x2
 
-    .line 301
+    .line 354
     invoke-virtual {p0, v8}, Ljava/lang/String;->charAt(I)C
 
     move-result v8
@@ -872,10 +1010,10 @@
 
     or-int/2addr v6, v7
 
-    .line 302
+    .line 355
     if-ge v5, v0, :cond_8d
 
-    .line 303
+    .line 356
     add-int/lit8 v7, v5, 0x1
 
     ushr-int/lit8 v8, v6, 0x10
@@ -886,11 +1024,11 @@
 
     move v5, v7
 
-    .line 305
+    .line 358
     :cond_8d
     if-ge v5, v0, :cond_97
 
-    .line 306
+    .line 359
     add-int/lit8 v7, v5, 0x1
 
     ushr-int/lit8 v8, v6, 0x8
@@ -901,11 +1039,11 @@
 
     move v5, v7
 
-    .line 308
+    .line 361
     :cond_97
     if-ge v5, v0, :cond_9f
 
-    .line 309
+    .line 362
     add-int/lit8 v7, v5, 0x1
 
     int-to-byte v6, v6
@@ -914,13 +1052,13 @@
 
     move v5, v7
 
-    .line 299
+    .line 352
     :cond_9f
     add-int/lit8 v3, v3, 0x4
 
     goto :goto_4e
 
-    .line 312
+    .line 365
     :cond_a2
     return-object v2
 .end method
@@ -928,7 +1066,7 @@
 .method private static fromPem(Ljava/lang/String;)[B
     .registers 3
 
-    .line 256
+    .line 309
     const-string v0, "-----BEGIN [A-Z ]+-----"
 
     const-string v1, ""
@@ -937,21 +1075,21 @@
 
     move-result-object p0
 
-    .line 257
+    .line 310
     const-string v0, "-----END [A-Z ]+-----"
 
     invoke-virtual {p0, v0, v1}, Ljava/lang/String;->replaceAll(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p0
 
-    .line 258
+    .line 311
     const-string v0, "\\s"
 
     invoke-virtual {p0, v0, v1}, Ljava/lang/String;->replaceAll(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p0
 
-    .line 259
+    .line 312
     invoke-static {p0}, Lcom/dingtalk/groupbill/net/CryptoBox;->fromB64(Ljava/lang/String;)[B
 
     move-result-object p0
@@ -967,7 +1105,7 @@
         }
     .end annotation
 
-    .line 211
+    .line 264
     new-instance v0, Ljava/lang/StringBuilder;
 
     invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
@@ -988,7 +1126,7 @@
 
     move-result-object p0
 
-    .line 212
+    .line 265
     new-instance v0, Ljava/net/URL;
 
     invoke-direct {v0, p0}, Ljava/net/URL;-><init>(Ljava/lang/String;)V
@@ -999,60 +1137,60 @@
 
     check-cast p0, Ljava/net/HttpURLConnection;
 
-    .line 213
+    .line 266
     const/16 v0, 0x1f40
 
     invoke-virtual {p0, v0}, Ljava/net/HttpURLConnection;->setConnectTimeout(I)V
 
-    .line 214
+    .line 267
     const/16 v0, 0x2ee0
 
     invoke-virtual {p0, v0}, Ljava/net/HttpURLConnection;->setReadTimeout(I)V
 
-    .line 215
+    .line 268
     const-string v0, "POST"
 
     invoke-virtual {p0, v0}, Ljava/net/HttpURLConnection;->setRequestMethod(Ljava/lang/String;)V
 
-    .line 216
+    .line 269
     const/4 v0, 0x1
 
     invoke-virtual {p0, v0}, Ljava/net/HttpURLConnection;->setDoOutput(Z)V
 
-    .line 217
+    .line 270
     const-string v0, "Content-Type"
 
     const-string v1, "application/json; charset=utf-8"
 
     invoke-virtual {p0, v0, v1}, Ljava/net/HttpURLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
 
-    .line 218
+    .line 271
     sget-object v0, Ljava/nio/charset/StandardCharsets;->UTF_8:Ljava/nio/charset/Charset;
 
     invoke-virtual {p1, v0}, Ljava/lang/String;->getBytes(Ljava/nio/charset/Charset;)[B
 
     move-result-object p1
 
-    .line 219
+    .line 272
     array-length v0, p1
 
     invoke-virtual {p0, v0}, Ljava/net/HttpURLConnection;->setFixedLengthStreamingMode(I)V
 
-    .line 220
+    .line 273
     invoke-virtual {p0}, Ljava/net/HttpURLConnection;->getOutputStream()Ljava/io/OutputStream;
 
     move-result-object v0
 
-    .line 221
+    .line 274
     invoke-virtual {v0, p1}, Ljava/io/OutputStream;->write([B)V
 
-    .line 222
+    .line 275
     invoke-virtual {v0}, Ljava/io/OutputStream;->flush()V
 
-    .line 223
+    .line 276
     invoke-virtual {v0}, Ljava/io/OutputStream;->close()V
 
-    .line 224
+    .line 277
     invoke-virtual {p0}, Ljava/net/HttpURLConnection;->getResponseCode()I
 
     move-result p1
@@ -1072,16 +1210,16 @@
 
     move-result-object p1
 
-    .line 225
+    .line 278
     :goto_62
     invoke-static {p1}, Lcom/dingtalk/groupbill/net/CryptoBox;->readAll(Ljava/io/InputStream;)Ljava/lang/String;
 
     move-result-object p1
 
-    .line 226
+    .line 279
     invoke-virtual {p0}, Ljava/net/HttpURLConnection;->disconnect()V
 
-    .line 227
+    .line 280
     return-object p1
 .end method
 
@@ -1093,7 +1231,7 @@
         }
     .end annotation
 
-    .line 339
+    .line 392
     if-eqz p0, :cond_5c
 
     sget-object v0, Lorg/json/JSONObject;->NULL:Ljava/lang/Object;
@@ -1102,13 +1240,13 @@
 
     goto :goto_5c
 
-    .line 342
+    .line 395
     :cond_7
     instance-of v0, p0, Lorg/json/JSONObject;
 
     if-eqz v0, :cond_12
 
-    .line 343
+    .line 396
     check-cast p0, Lorg/json/JSONObject;
 
     invoke-static {p0}, Lcom/dingtalk/groupbill/net/CryptoBox;->sortedJson(Lorg/json/JSONObject;)Ljava/lang/String;
@@ -1117,23 +1255,23 @@
 
     return-object p0
 
-    .line 345
+    .line 398
     :cond_12
     instance-of v0, p0, Lorg/json/JSONArray;
 
     if-eqz v0, :cond_45
 
-    .line 346
+    .line 399
     check-cast p0, Lorg/json/JSONArray;
 
-    .line 347
+    .line 400
     new-instance v0, Ljava/lang/StringBuilder;
 
     const-string v1, "["
 
     invoke-direct {v0, v1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
 
-    .line 348
+    .line 401
     const/4 v1, 0x0
 
     :goto_20
@@ -1143,15 +1281,15 @@
 
     if-ge v1, v2, :cond_3b
 
-    .line 349
+    .line 402
     if-lez v1, :cond_2d
 
-    .line 350
+    .line 403
     const/16 v2, 0x2c
 
     invoke-virtual {v0, v2}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
-    .line 352
+    .line 405
     :cond_2d
     invoke-virtual {p0, v1}, Lorg/json/JSONArray;->get(I)Ljava/lang/Object;
 
@@ -1163,25 +1301,25 @@
 
     invoke-virtual {v0, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    .line 348
+    .line 401
     add-int/lit8 v1, v1, 0x1
 
     goto :goto_20
 
-    .line 354
+    .line 407
     :cond_3b
     const/16 p0, 0x5d
 
     invoke-virtual {v0, p0}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
-    .line 355
+    .line 408
     invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
 
     move-result-object p0
 
     return-object p0
 
-    .line 357
+    .line 410
     :cond_45
     instance-of v0, p0, Ljava/lang/Number;
 
@@ -1193,7 +1331,7 @@
 
     goto :goto_57
 
-    .line 360
+    .line 413
     :cond_4e
     invoke-static {p0}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
 
@@ -1205,7 +1343,7 @@
 
     return-object p0
 
-    .line 358
+    .line 411
     :cond_57
     :goto_57
     invoke-static {p0}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
@@ -1214,7 +1352,7 @@
 
     return-object p0
 
-    .line 340
+    .line 393
     :cond_5c
     :goto_5c
     const-string p0, "null"
@@ -1222,10 +1360,37 @@
     return-object p0
 .end method
 
+.method public static nick()Ljava/lang/String;
+    .registers 2
+
+    .line 105
+    sget-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->LOCK:Ljava/lang/Object;
+
+    monitor-enter v0
+
+    .line 106
+    :try_start_3
+    sget-object v1, Lcom/dingtalk/groupbill/net/CryptoBox;->nickName:Ljava/lang/String;
+
+    monitor-exit v0
+
+    return-object v1
+
+    .line 107
+    :catchall_7
+    move-exception v1
+
+    monitor-exit v0
+    :try_end_9
+    .catchall {:try_start_3 .. :try_end_9} :catchall_7
+
+    throw v1
+.end method
+
 .method public static prepareHttp(Ljava/net/HttpURLConnection;Ljava/lang/String;Lorg/json/JSONObject;)[B
     .registers 6
 
-    .line 96
+    .line 135
     invoke-virtual {p2}, Lorg/json/JSONObject;->toString()Ljava/lang/String;
 
     move-result-object v0
@@ -1236,18 +1401,18 @@
 
     move-result-object v0
 
-    .line 98
+    .line 137
     :try_start_a
     invoke-static {}, Lcom/dingtalk/groupbill/net/CryptoBox;->ensureEnrolled()V
 
-    .line 99
+    .line 138
     sget-object v1, Lcom/dingtalk/groupbill/net/CryptoBox;->LOCK:Ljava/lang/Object;
 
     monitor-enter v1
     :try_end_10
     .catchall {:try_start_a .. :try_end_10} :catchall_41
 
-    .line 100
+    .line 139
     :try_start_10
     sget-boolean v2, Lcom/dingtalk/groupbill/net/CryptoBox;->enrolled:Z
 
@@ -1263,13 +1428,13 @@
 
     goto :goto_3c
 
-    .line 103
+    .line 142
     :cond_1d
     monitor-exit v1
     :try_end_1e
     .catchall {:try_start_10 .. :try_end_1e} :catchall_3e
 
-    .line 104
+    .line 143
     :try_start_1e
     invoke-virtual {p2}, Lorg/json/JSONObject;->toString()Ljava/lang/String;
 
@@ -1285,7 +1450,7 @@
 
     move-result-object p2
 
-    .line 105
+    .line 144
     invoke-virtual {p2}, Lorg/json/JSONObject;->toString()Ljava/lang/String;
 
     move-result-object p2
@@ -1296,17 +1461,17 @@
 
     move-result-object p2
 
-    .line 106
+    .line 145
     const-string v1, "POST"
 
     invoke-static {p0, v1, p1, p2}, Lcom/dingtalk/groupbill/net/CryptoBox;->applySignHeaders(Ljava/net/HttpURLConnection;Ljava/lang/String;Ljava/lang/String;[B)V
     :try_end_3b
     .catchall {:try_start_1e .. :try_end_3b} :catchall_41
 
-    .line 107
+    .line 146
     return-object p2
 
-    .line 101
+    .line 140
     :cond_3c
     :goto_3c
     :try_start_3c
@@ -1314,7 +1479,7 @@
 
     return-object v0
 
-    .line 103
+    .line 142
     :catchall_3e
     move-exception p0
 
@@ -1327,11 +1492,11 @@
     :try_end_41
     .catchall {:try_start_40 .. :try_end_41} :catchall_41
 
-    .line 108
+    .line 147
     :catchall_41
     move-exception p0
 
-    .line 109
+    .line 148
     return-object v0
 .end method
 
@@ -1343,26 +1508,26 @@
         }
     .end annotation
 
-    .line 231
+    .line 284
     if-nez p0, :cond_5
 
-    .line 232
+    .line 285
     const-string p0, ""
 
     return-object p0
 
-    .line 234
+    .line 287
     :cond_5
     new-instance v0, Ljava/io/ByteArrayOutputStream;
 
     invoke-direct {v0}, Ljava/io/ByteArrayOutputStream;-><init>()V
 
-    .line 235
+    .line 288
     const/16 v1, 0x1000
 
     new-array v1, v1, [B
 
-    .line 237
+    .line 290
     :goto_e
     invoke-virtual {p0, v1}, Ljava/io/InputStream;->read([B)I
 
@@ -1370,18 +1535,18 @@
 
     if-lez v2, :cond_19
 
-    .line 238
+    .line 291
     const/4 v3, 0x0
 
     invoke-virtual {v0, v1, v3, v2}, Ljava/io/ByteArrayOutputStream;->write([BII)V
 
     goto :goto_e
 
-    .line 240
+    .line 293
     :cond_19
     invoke-virtual {p0}, Ljava/io/InputStream;->close()V
 
-    .line 241
+    .line 294
     new-instance p0, Ljava/lang/String;
 
     invoke-virtual {v0}, Ljava/io/ByteArrayOutputStream;->toByteArray()[B
@@ -1398,8 +1563,8 @@
 .method public static setIdentity(Ljava/lang/String;Ljava/lang/String;)V
     .registers 4
 
-    .line 59
-    if-eqz p0, :cond_24
+    .line 60
+    if-eqz p0, :cond_2f
 
     invoke-virtual {p0}, Ljava/lang/String;->isEmpty()Z
 
@@ -1407,15 +1572,15 @@
 
     if-eqz v0, :cond_9
 
-    goto :goto_24
+    goto :goto_2f
 
-    .line 62
+    .line 63
     :cond_9
     sget-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->LOCK:Ljava/lang/Object;
 
     monitor-enter v0
 
-    .line 63
+    .line 64
     :try_start_c
     sget-object v1, Lcom/dingtalk/groupbill/net/CryptoBox;->userId:Ljava/lang/String;
 
@@ -1425,16 +1590,16 @@
 
     if-nez v1, :cond_17
 
-    .line 64
+    .line 65
     const/4 v1, 0x0
 
     sput-boolean v1, Lcom/dingtalk/groupbill/net/CryptoBox;->enrolled:Z
 
-    .line 66
+    .line 67
     :cond_17
     sput-object p0, Lcom/dingtalk/groupbill/net/CryptoBox;->userId:Ljava/lang/String;
 
-    .line 67
+    .line 68
     if-nez p1, :cond_1d
 
     const-string p1, ""
@@ -1442,47 +1607,125 @@
     :cond_1d
     sput-object p1, Lcom/dingtalk/groupbill/net/CryptoBox;->accountId:Ljava/lang/String;
 
-    .line 68
-    monitor-exit v0
-
     .line 69
+    monitor-exit v0
+    :try_end_20
+    .catchall {:try_start_c .. :try_end_20} :catchall_2c
+
+    .line 71
+    sget-object p0, Lcom/dingtalk/groupbill/net/CryptoBox;->nickName:Ljava/lang/String;
+
+    invoke-virtual {p0}, Ljava/lang/String;->isEmpty()Z
+
+    move-result p0
+
+    if-eqz p0, :cond_2b
+
+    .line 72
+    invoke-static {}, Lcom/dingtalk/groupbill/net/CryptoBox;->fetchNick()V
+
+    .line 74
+    :cond_2b
     return-void
 
-    .line 68
-    :catchall_21
+    .line 69
+    :catchall_2c
     move-exception p0
 
+    :try_start_2d
     monitor-exit v0
-    :try_end_23
-    .catchall {:try_start_c .. :try_end_23} :catchall_21
+    :try_end_2e
+    .catchall {:try_start_2d .. :try_end_2e} :catchall_2c
 
     throw p0
 
-    .line 60
-    :cond_24
-    :goto_24
+    .line 61
+    :cond_2f
+    :goto_2f
     return-void
 .end method
 
 .method public static signWsData(Ljava/lang/String;Lorg/json/JSONObject;)V
     .registers 7
 
-    .line 115
-    if-eqz p1, :cond_81
+    .line 154
+    if-eqz p1, :cond_a0
 
     if-nez p0, :cond_6
 
-    goto/16 :goto_81
+    goto/16 :goto_a0
 
-    .line 118
+    .line 158
     :cond_6
+    const-string v0, "register"
+
+    invoke-virtual {v0, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_25
+
+    .line 160
+    sget-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->LOCK:Ljava/lang/Object;
+
+    monitor-enter v0
+
+    .line 161
+    :try_start_11
+    sget-object p0, Lcom/dingtalk/groupbill/net/CryptoBox;->nickName:Ljava/lang/String;
+
+    .line 162
+    monitor-exit v0
+    :try_end_14
+    .catchall {:try_start_11 .. :try_end_14} :catchall_22
+
+    .line 163
+    invoke-virtual {p0}, Ljava/lang/String;->isEmpty()Z
+
+    move-result v0
+
+    if-nez v0, :cond_21
+
+    .line 165
+    :try_start_1a
+    const-string v0, "nick"
+
+    invoke-virtual {p1, v0, p0}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
+    :try_end_1f
+    .catchall {:try_start_1a .. :try_end_1f} :catchall_20
+
+    .line 167
+    goto :goto_21
+
+    .line 166
+    :catchall_20
+    move-exception p0
+
+    .line 169
+    :cond_21
+    :goto_21
+    return-void
+
+    .line 162
+    :catchall_22
+    move-exception p0
+
+    :try_start_23
+    monitor-exit v0
+    :try_end_24
+    .catchall {:try_start_23 .. :try_end_24} :catchall_22
+
+    throw p0
+
+    .line 171
+    :cond_25
     const-string v0, "bill.upsert"
 
     invoke-virtual {v0, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
     move-result v0
 
-    if-nez v0, :cond_1f
+    if-nez v0, :cond_3e
 
     const-string v0, "alipay.upload"
 
@@ -1490,7 +1733,7 @@
 
     move-result v0
 
-    if-nez v0, :cond_1f
+    if-nez v0, :cond_3e
 
     const-string v0, "rpc.result"
 
@@ -1498,46 +1741,46 @@
 
     move-result p0
 
-    if-nez p0, :cond_1f
+    if-nez p0, :cond_3e
 
-    .line 119
+    .line 172
     return-void
 
-    .line 122
-    :cond_1f
-    :try_start_1f
+    .line 175
+    :cond_3e
+    :try_start_3e
     invoke-static {}, Lcom/dingtalk/groupbill/net/CryptoBox;->ensureEnrolled()V
 
-    .line 124
+    .line 177
     sget-object p0, Lcom/dingtalk/groupbill/net/CryptoBox;->LOCK:Ljava/lang/Object;
 
     monitor-enter p0
-    :try_end_25
-    .catchall {:try_start_1f .. :try_end_25} :catchall_7f
+    :try_end_44
+    .catchall {:try_start_3e .. :try_end_44} :catchall_9e
 
-    .line 125
-    :try_start_25
+    .line 178
+    :try_start_44
     sget-boolean v0, Lcom/dingtalk/groupbill/net/CryptoBox;->enrolled:Z
 
-    if-eqz v0, :cond_7a
+    if-eqz v0, :cond_99
 
     sget-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->hmacSecret:[B
 
-    if-nez v0, :cond_2e
+    if-nez v0, :cond_4d
 
-    goto :goto_7a
+    goto :goto_99
 
-    .line 128
-    :cond_2e
+    .line 181
+    :cond_4d
     sget-object v0, Lcom/dingtalk/groupbill/net/CryptoBox;->hmacSecret:[B
 
-    .line 129
+    .line 182
     monitor-exit p0
-    :try_end_31
-    .catchall {:try_start_25 .. :try_end_31} :catchall_7c
+    :try_end_50
+    .catchall {:try_start_44 .. :try_end_50} :catchall_9b
 
-    .line 130
-    :try_start_31
+    .line 183
+    :try_start_50
     invoke-static {}, Ljava/lang/System;->currentTimeMillis()J
 
     move-result-wide v1
@@ -1546,7 +1789,7 @@
 
     div-long/2addr v1, v3
 
-    .line 131
+    .line 184
     invoke-static {}, Ljava/util/UUID;->randomUUID()Ljava/util/UUID;
 
     move-result-object p0
@@ -1563,29 +1806,29 @@
 
     move-result-object p0
 
-    .line 132
+    .line 185
     const-string v3, "ts"
 
     invoke-virtual {p1, v3, v1, v2}, Lorg/json/JSONObject;->put(Ljava/lang/String;J)Lorg/json/JSONObject;
 
-    .line 133
+    .line 186
     const-string v1, "nonce"
 
     invoke-virtual {p1, v1, p0}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
 
-    .line 135
+    .line 188
     invoke-static {p1}, Lcom/dingtalk/groupbill/net/CryptoBox;->sortedJson(Lorg/json/JSONObject;)Ljava/lang/String;
 
     move-result-object p0
 
-    .line 136
+    .line 189
     const-string v1, "HmacSHA256"
 
     invoke-static {v1}, Ljavax/crypto/Mac;->getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;
 
     move-result-object v1
 
-    .line 137
+    .line 190
     new-instance v2, Ljavax/crypto/spec/SecretKeySpec;
 
     const-string v3, "HmacSHA256"
@@ -1594,7 +1837,7 @@
 
     invoke-virtual {v1, v2}, Ljavax/crypto/Mac;->init(Ljava/security/Key;)V
 
-    .line 138
+    .line 191
     const-string v0, "sig"
 
     sget-object v2, Ljava/nio/charset/StandardCharsets;->UTF_8:Ljava/nio/charset/Charset;
@@ -1612,44 +1855,44 @@
     move-result-object p0
 
     invoke-virtual {p1, v0, p0}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
-    :try_end_79
-    .catchall {:try_start_31 .. :try_end_79} :catchall_7f
+    :try_end_98
+    .catchall {:try_start_50 .. :try_end_98} :catchall_9e
 
-    .line 141
-    goto :goto_80
+    .line 194
+    goto :goto_9f
 
-    .line 126
-    :cond_7a
-    :goto_7a
-    :try_start_7a
+    .line 179
+    :cond_99
+    :goto_99
+    :try_start_99
     monitor-exit p0
 
     return-void
 
-    .line 129
-    :catchall_7c
+    .line 182
+    :catchall_9b
     move-exception p1
 
     monitor-exit p0
-    :try_end_7e
-    .catchall {:try_start_7a .. :try_end_7e} :catchall_7c
+    :try_end_9d
+    .catchall {:try_start_99 .. :try_end_9d} :catchall_9b
 
-    :try_start_7e
+    :try_start_9d
     throw p1
-    :try_end_7f
-    .catchall {:try_start_7e .. :try_end_7f} :catchall_7f
+    :try_end_9e
+    .catchall {:try_start_9d .. :try_end_9e} :catchall_9e
 
-    .line 139
-    :catchall_7f
+    .line 192
+    :catchall_9e
     move-exception p0
 
-    .line 142
-    :goto_80
+    .line 195
+    :goto_9f
     return-void
 
-    .line 116
-    :cond_81
-    :goto_81
+    .line 155
+    :cond_a0
+    :goto_a0
     return-void
 .end method
 
@@ -1661,17 +1904,17 @@
         }
     .end annotation
 
-    .line 317
+    .line 370
     new-instance v0, Ljava/util/ArrayList;
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
-    .line 318
+    .line 371
     invoke-virtual {p0}, Lorg/json/JSONObject;->keys()Ljava/util/Iterator;
 
     move-result-object v1
 
-    .line 319
+    .line 372
     :goto_9
     invoke-interface {v1}, Ljava/util/Iterator;->hasNext()Z
 
@@ -1679,7 +1922,7 @@
 
     if-eqz v2, :cond_23
 
-    .line 320
+    .line 373
     invoke-interface {v1}, Ljava/util/Iterator;->next()Ljava/lang/Object;
 
     move-result-object v2
@@ -1688,7 +1931,7 @@
 
     move-result-object v2
 
-    .line 321
+    .line 374
     const-string v3, "sig"
 
     invoke-virtual {v3, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
@@ -1697,25 +1940,25 @@
 
     if-nez v3, :cond_22
 
-    .line 322
+    .line 375
     invoke-virtual {v0, v2}, Ljava/util/ArrayList;->add(Ljava/lang/Object;)Z
 
-    .line 324
+    .line 377
     :cond_22
     goto :goto_9
 
-    .line 325
+    .line 378
     :cond_23
     invoke-static {v0}, Ljava/util/Collections;->sort(Ljava/util/List;)V
 
-    .line 326
+    .line 379
     new-instance v1, Ljava/lang/StringBuilder;
 
     const-string v2, "{"
 
     invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
 
-    .line 327
+    .line 380
     const/4 v2, 0x0
 
     :goto_2e
@@ -1725,15 +1968,15 @@
 
     if-ge v2, v3, :cond_5d
 
-    .line 328
+    .line 381
     if-lez v2, :cond_3b
 
-    .line 329
+    .line 382
     const/16 v3, 0x2c
 
     invoke-virtual {v1, v3}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
-    .line 331
+    .line 384
     :cond_3b
     invoke-virtual {v0, v2}, Ljava/util/ArrayList;->get(I)Ljava/lang/Object;
 
@@ -1741,7 +1984,7 @@
 
     check-cast v3, Ljava/lang/String;
 
-    .line 332
+    .line 385
     invoke-static {v3}, Lorg/json/JSONObject;->quote(Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v4
@@ -1766,18 +2009,18 @@
 
     invoke-virtual {v4, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    .line 327
+    .line 380
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_2e
 
-    .line 334
+    .line 387
     :cond_5d
     const/16 p0, 0x7d
 
     invoke-virtual {v1, p0}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
-    .line 335
+    .line 388
     invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
 
     move-result-object p0
@@ -1788,14 +2031,14 @@
 .method private static toB64([B)Ljava/lang/String;
     .registers 7
 
-    .line 263
+    .line 316
     const-string v0, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
     invoke-virtual {v0}, Ljava/lang/String;->toCharArray()[C
 
     move-result-object v0
 
-    .line 264
+    .line 317
     new-instance v1, Ljava/lang/StringBuilder;
 
     array-length v2, p0
@@ -1808,10 +2051,10 @@
 
     invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(I)V
 
-    .line 265
+    .line 318
     const/4 v2, 0x0
 
-    .line 266
+    .line 319
     :goto_13
     add-int/lit8 v3, v2, 0x2
 
@@ -1819,7 +2062,7 @@
 
     if-ge v3, v4, :cond_54
 
-    .line 267
+    .line 320
     aget-byte v4, p0, v2
 
     and-int/lit16 v4, v4, 0xff
@@ -1842,7 +2085,7 @@
 
     or-int/2addr v3, v4
 
-    .line 268
+    .line 321
     ushr-int/lit8 v4, v3, 0x12
 
     and-int/lit8 v4, v4, 0x3f
@@ -1869,7 +2112,7 @@
 
     aget-char v5, v0, v5
 
-    .line 269
+    .line 322
     invoke-virtual {v4, v5}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
     move-result-object v4
@@ -1880,26 +2123,26 @@
 
     invoke-virtual {v4, v3}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
-    .line 270
+    .line 323
     add-int/lit8 v2, v2, 0x3
 
-    .line 271
+    .line 324
     goto :goto_13
 
-    .line 272
+    .line 325
     :cond_54
     array-length v3, p0
 
     if-ge v2, v3, :cond_9b
 
-    .line 273
+    .line 326
     aget-byte v3, p0, v2
 
     and-int/lit16 v3, v3, 0xff
 
     shl-int/lit8 v3, v3, 0x10
 
-    .line 274
+    .line 327
     ushr-int/lit8 v4, v3, 0x12
 
     and-int/lit8 v4, v4, 0x3f
@@ -1908,14 +2151,14 @@
 
     invoke-virtual {v1, v4}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
-    .line 275
+    .line 328
     add-int/lit8 v2, v2, 0x1
 
     array-length v4, p0
 
     if-ge v2, v4, :cond_8c
 
-    .line 276
+    .line 329
     aget-byte p0, p0, v2
 
     and-int/lit16 p0, p0, 0xff
@@ -1924,7 +2167,7 @@
 
     or-int/2addr p0, v3
 
-    .line 277
+    .line 330
     ushr-int/lit8 v2, p0, 0xc
 
     and-int/lit8 v2, v2, 0x3f
@@ -1951,7 +2194,7 @@
 
     goto :goto_9b
 
-    .line 279
+    .line 332
     :cond_8c
     ushr-int/lit8 p0, v3, 0xc
 
@@ -1967,7 +2210,7 @@
 
     invoke-virtual {p0, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    .line 282
+    .line 335
     :cond_9b
     :goto_9b
     invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
@@ -1980,21 +2223,21 @@
 .method private static toHex([B)Ljava/lang/String;
     .registers 7
 
-    .line 364
+    .line 417
     const-string v0, "0123456789abcdef"
 
     invoke-virtual {v0}, Ljava/lang/String;->toCharArray()[C
 
     move-result-object v0
 
-    .line 365
+    .line 418
     array-length v1, p0
 
     mul-int/lit8 v1, v1, 0x2
 
     new-array v1, v1, [C
 
-    .line 366
+    .line 419
     const/4 v2, 0x0
 
     :goto_c
@@ -2002,12 +2245,12 @@
 
     if-ge v2, v3, :cond_26
 
-    .line 367
+    .line 420
     aget-byte v3, p0, v2
 
     and-int/lit16 v3, v3, 0xff
 
-    .line 368
+    .line 421
     mul-int/lit8 v4, v2, 0x2
 
     ushr-int/lit8 v5, v3, 0x4
@@ -2016,7 +2259,7 @@
 
     aput-char v5, v1, v4
 
-    .line 369
+    .line 422
     add-int/lit8 v4, v4, 0x1
 
     and-int/lit8 v3, v3, 0xf
@@ -2025,12 +2268,12 @@
 
     aput-char v3, v1, v4
 
-    .line 366
+    .line 419
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_c
 
-    .line 371
+    .line 424
     :cond_26
     new-instance p0, Ljava/lang/String;
 
@@ -2042,17 +2285,17 @@
 .method private static toPem(Ljava/lang/String;[B)Ljava/lang/String;
     .registers 7
 
-    .line 245
+    .line 298
     invoke-static {p1}, Lcom/dingtalk/groupbill/net/CryptoBox;->toB64([B)Ljava/lang/String;
 
     move-result-object p1
 
-    .line 246
+    .line 299
     new-instance v0, Ljava/lang/StringBuilder;
 
     invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
 
-    .line 247
+    .line 300
     const-string v1, "-----BEGIN "
 
     invoke-virtual {v0, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
@@ -2067,7 +2310,7 @@
 
     invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    .line 248
+    .line 301
     const/4 v1, 0x0
 
     :goto_19
@@ -2077,7 +2320,7 @@
 
     if-ge v1, v3, :cond_34
 
-    .line 249
+    .line 302
     add-int/lit8 v3, v1, 0x40
 
     invoke-virtual {p1}, Ljava/lang/String;->length()I
@@ -2096,12 +2339,12 @@
 
     invoke-virtual {v1, v4}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
 
-    .line 248
+    .line 301
     move v1, v3
 
     goto :goto_19
 
-    .line 251
+    .line 304
     :cond_34
     const-string p1, "-----END "
 
@@ -2115,7 +2358,7 @@
 
     invoke-virtual {p0, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    .line 252
+    .line 305
     invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
 
     move-result-object p0

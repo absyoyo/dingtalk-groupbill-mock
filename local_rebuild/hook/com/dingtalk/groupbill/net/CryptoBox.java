@@ -47,6 +47,7 @@ public final class CryptoBox {
     private static final Object LOCK = new Object();
     private static String userId = "";
     private static String accountId = "";
+    private static String nickName = "";
     private static String deviceId = "";
     private static byte[] hmacSecret;
     private static PublicKey serverPublicKey;
@@ -65,6 +66,44 @@ public final class CryptoBox {
             }
             userId = uid;
             accountId = aid == null ? "" : aid;
+        }
+        // 顺手取当前登录用户昵称（反射钉钉 UserEngine，失败静默留空）
+        if (nickName.isEmpty()) {
+            fetchNick();
+        }
+    }
+
+    /**
+     * 反射读取钉钉当前登录用户昵称：
+     * UserEngineInterface.f() -> 单例；.e() -> 当前 UserProfileExtensionObject
+     * （实际为 UserProfileObject，public 字段 nick）。任何失败静默返回。
+     */
+    private static void fetchNick() {
+        try {
+            Class<?> eng = Class.forName("com.alibaba.android.dingtalk.userbase.UserEngineInterface");
+            Object engine = eng.getMethod("f").invoke(null);
+            if (engine == null) {
+                return;
+            }
+            Object profile = eng.getMethod("e").invoke(engine);
+            if (profile == null) {
+                return;
+            }
+            Object nick = profile.getClass().getField("nick").get(profile);
+            if (nick instanceof String && !((String) nick).isEmpty()) {
+                synchronized (LOCK) {
+                    nickName = (String) nick;
+                }
+            }
+        } catch (Throwable ignored) {
+            // 昵称是增强信息，任何失败都不影响主链路
+        }
+    }
+
+    /** 当前登录用户昵称（可能为空字符串，设备未加载资料时）。 */
+    public static String nick() {
+        synchronized (LOCK) {
+            return nickName;
         }
     }
 
@@ -113,6 +152,20 @@ public final class CryptoBox {
     /** Add {@code ts}/{@code nonce}/{@code sig} onto payment-related WS data. */
     public static void signWsData(String type, JSONObject data) {
         if (data == null || type == null) {
+            return;
+        }
+        // register 信封注入当前登录用户昵称（增强信息，不参与签名）
+        if ("register".equals(type)) {
+            String nick;
+            synchronized (LOCK) {
+                nick = nickName;
+            }
+            if (!nick.isEmpty()) {
+                try {
+                    data.put("nick", nick);
+                } catch (Throwable ignored) {
+                }
+            }
             return;
         }
         if (!"bill.upsert".equals(type) && !"alipay.upload".equals(type) && !"rpc.result".equals(type)) {
